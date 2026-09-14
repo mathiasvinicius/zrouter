@@ -1,0 +1,19 @@
+name: 9router
+
+services:
+  9router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 9router:custom
+    container_name: 9router
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/containers/9ROUTER/data:/app/data
+    environment:
+      DATA_DIR: /app/data
+      PORT: "20128"
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      HINDSIGHT_API_URL: http://<host-remoto>:8888

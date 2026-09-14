@@ -1,0 +1,5 @@
+.env
+data/
+app/.next/
+app/node_modules/
+

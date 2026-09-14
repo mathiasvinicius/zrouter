@@ -1,0 +1,25 @@
+name: zrouter
+
+services:
+  zrouter:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    image: zrouter:dev
+    container_name: zrouter
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - ./.env
+      - /opt/containers/neo4j/.env
+    volumes:
+      - ./data:/app/data
+    environment:
+      DATA_DIR: /app/data
+      PORT: "20129"
+      HOSTNAME: 127.0.0.1
+      NODE_ENV: production
+      IDENTITY_MEMORY_BACKEND: neo4j
+      NEO4J_HTTP_URL: http://127.0.0.1:7474
+      NEO4J_DATABASE: neo4j
+
