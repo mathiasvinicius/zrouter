@@ -19,9 +19,8 @@ docker ps --filter name=^zrouter$
 curl -I http://127.0.0.1:20129/
 ```
 
-O acesso inicial ao dashboard é somente pelo loopback. A senha fica em `/opt/containers/zrouter/.env`; não compartilhar esse arquivo. Antes de disponibilizar remotamente, implementar autenticação/segregação de fontes e rever a superfície de rede.
+O dashboard escuta nas interfaces do host para acesso via Tailscale; a senha fica em `/opt/containers/zrouter/.env`; não compartilhar esse arquivo. Antes de disponibilizar a terceiros, implementar autenticação/segregação de fontes e rever a superfície de rede.
 
 ## Princípio de produto
 
 ZRouter é um roteador enxuto com fontes de conhecimento úteis, não uma cópia integral do OmniRoute nem um segundo Open Notebook. Cada recurso novo exige um caso de uso, teste de integração e indicação clara de custo/latência. O 9Router de produção não muda até um cutover explicitamente validado.
-

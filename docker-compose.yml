@@ -17,9 +17,9 @@ services:
     environment:
       DATA_DIR: /app/data
       PORT: "20129"
-      HOSTNAME: 127.0.0.1
+      # Expose only on the host interfaces (firewall/Tailscale policy controls access).
+      HOSTNAME: 0.0.0.0
       NODE_ENV: production
       IDENTITY_MEMORY_BACKEND: neo4j
       NEO4J_HTTP_URL: http://127.0.0.1:7474
       NEO4J_DATABASE: neo4j
-
