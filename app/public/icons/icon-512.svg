@@ -1,4 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#07233b"/>
-  <text x="256" y="320" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#ffffff" text-anchor="middle">ZR</text>
+  <rect width="512" height="512" rx="112" fill="#07233b"/>
+  <g transform="translate(256 256) scale(7)">
+    <path d="M0 -19 L16.5 -9.5 L16.5 9.5 L0 19 L-16.5 9.5 L-16.5 -9.5 Z" fill="none" stroke="#033f7b" stroke-width="2.5"/>
+    <path d="M-14 -8 L-6 -12.6 L-6 -3.4 Z" fill="#769c85"/>
+    <path d="M-14 8 L-6 3.4 L-14 0 Z" fill="#dce8f4"/>
+    <path d="M14 -8 L6 -12.6 L14 -16 Z" fill="#033f7b"/>
+    <path d="M14 8 L6 12.6 L14 16 Z" fill="#769c85"/>
+    <circle r="4.5" fill="#dce8f4"/>
+  </g>
 </svg>
