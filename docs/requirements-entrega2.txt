@@ -1,0 +1,74 @@
+# REQUIREMENTS — Entrega 2 do ZRouter: provider UX (import/sync de modelos) + sistema de temas
+
+**Executor:** Prime Agent (provider 9router, modelo `cx/gpt-5.6-sol`, thinking medium)
+**Repo:** `/opt/containers/zrouter/app` (git limpo em cc10be4; NÃO altere docs/ não-rastreados)
+**Contexto obrigatório (leia antes):**
+- `/opt/containers/zrouter/docs/infusion-design.md` — escopo geral; esta é a frente A (item 4) + frente E (temas)
+- `/opt/containers/omniroute-src/` — referência de UX: `src/app/(dashboard)/dashboard/api-manager` (modais), tema em `src/store/themeStore.ts` + `src/app/globals.css`
+- Modelo da UX desejada: página de provider do 9Router (print do Soberano): seção "Modelos Disponíveis" com botão `Importar de /models`, toggle `Buscar automaticamente modelos upstream`, toggle `Sincronização automática`
+
+## A. IMPORTAR DE /MODELS (backend + UI)
+
+1. Novo endpoint: `POST /api/providers/[id]/models/discover`
+   - Body: `{ node_id?: string }` (se dado, usa a key da conexão específica; senão a primeira conexão ativa)
+   - Resolve a URL de discovery do provider: consulte o mapa já existente em `src/app/api/providers/[id]/models/route.js` (função `createOpenAIModelsConfig` e mapa por provider) e/ou `modelsFetcher` nos registry de `open-sse/providers/registry/<provider>.js`
+   - `GET <url>` com `Authorization: Bearer <key da conexão>` → extrai `data[].id` (OpenAI format) ou formato específico do provider
+   - Salva **catálogo em cache** com timestamp (tabela ou campo `discovered_models` + `discovered_at` em providerConnections/providerNodes — reuse o schema; se precisar de migration, idempotente como a 002)
+   - Retorna `{ models: [{id, name}], discoveredAt, count, fromCache: bool }`
+   - Timeout 10s; erro upstream → 502 com mensagem limpa, SEM a key no texto
+2. UI: no `ModelsCard.js` da página `providers/[id]`, botão **"Importar de /models"**:
+   - Abre modal (padrão dos modais existentes: dark, mesmos componentes Button/Input)
+   - Lista os modelos descobertos com checkbox + busca local
+   - Importa selecionados como compatible models (`upstreamModelId` preenchido) via POST existente de models
+   - Botão "Recarregar" refaz o discover (ignora cache)
+
+## B. BUSCAR AUTOMATICAMENTE (toggle por conexão)
+
+3. Toggle "Buscar automaticamente modelos upstream" na seção de modelos do provider (por provider, não por conexão — mais simples e útil)
+   - Persistir em `providerConnections`/settings do provider: campo `autoDiscoverModels` (bool)
+   - Quando ON: ao abrir a página, se `discovered_at` > 6h ou vazio, dispara discover em background e atualiza a lista
+   - Estado do toggle persistido via PATCH no provider
+
+## C. SINCRONIZAÇÃO AUTOMÁTICA (toggle por provider)
+
+4. Toggle "Sincronização automática" (por provider, na seção Modelos Disponíveis)
+   - Persistido como `autoSyncModels` (bool) + `last_sync_at`
+   - Quando ON: lazy-sync a cada acesso à página: se `last_sync_at` > 12h, executa discover e:
+     - Modelos novos upstream → adicionados como compatible (disabled=false)
+     - Modelos que sumiram upstream → marcados `disabled=true` (não deletar)
+     - Diff registrado em log estruturado (sem credenciais) e toast na UI com "+N novos / -M desabilitados"
+   - Sem cron/worker novo; checagem lazy é suficiente (ponytail: trocar por job dedicado se houver >50 providers com sync ON)
+
+## D. SISTEMA DE TEMAS (portar do OmniRoute)
+
+5. **Color themes**: portar o mecanismo de `themeStore.ts` (COLOR_THEMES: coral/blue/red/green/violet/orange/cyan + custom hex) para o zrouter em JS:
+   - `applyColorTheme(name, customHex)` injeta `--color-primary`, `--color-primary-hover` (+ derivados de accent se aplicável) no `:root`, em AMBOS os modos (light e dark)
+   - Integrar com o `ThemeProvider.js`/themeStore **existentes** do zrouter (mesma chave zustand `theme` + persist) — NÃO quebrar o toggle dark/light nem o script inline do layout
+6. **UI do seletor:** no ThemeToggle/header do dashboard: seletor de cor (7 swatches + color picker custom) + toggle dark/light já existente
+7. Persistência: mesma storage key existente (`theme`) — adicionar `colorTheme`/`customColor` ao estado, retrocompatível
+8. A página Fontes e a seção SourcesSection (Entrega 1) devem ficar consistentes com os temas (usar as CSS vars, não hex hardcoded — verificar e corrigir se houver cor literal nova)
+
+## O QUE NÃO FAZER
+
+- NÃO portar banners de sponsor (Kimi/VsCode/CheaperInference), gamificação, leaderboard, idiomas PT-BR extras (i18n já existe — não toque), A2A, plugins
+- NÃO trocar a fonte nem o design base; manter dark como padrão atual
+- NÃO deletar modelos custom criados manualmente pelo usuário no sync (só marcar disabled com flag `source: "discovered"`)
+- NENHUMA credencial em logs/erros; NUNCA logar a key da conexão
+- NÃO reiniciar containers; NÃO tocar no 9Router de produção (20128)
+- NÃO alterar o design das páginas Fontes/Entrega 1 além do necessário para consistência de tema
+
+## TESTES OBRIGATÓRIOS
+
+1. Unit: discover endpoint — mock upstream `/v1/models`; key inválida → 502; cache hit retorna `fromCache: true`
+2. Unit: autoSync lazy — `last_sync_at` < 12h → não re-descobre; > 12h → descobre e persiste; modelos sumidos ficam `disabled`, custom models do usuário intactos
+3. Unit: tema — aplicar `colorTheme: 'blue'` → `--color-primary` = `#3b82f6` no CSS injetado; custom hex válido/inválido
+4. Rodar: `cd tests && npx vitest run --config vitest.config.js unit/sources-*.test.js <novos>` — fontes continuam verdes (sem regressão da Entrega 1)
+5. `npm run build` rc=0
+6. Commit único: `feat(providers): model discovery/import/auto-sync + color themes (Entrega 2)`
+
+## AMBIENTE
+
+- Serviços reais para teste: Open Notebook 5055 (senha em /opt/containers/open-notebook/.env), Neo4j 7474 (creds em /opt/containers/neo4j/.env)
+- SQLite: `/opt/containers/zrouter/data/db/data.sqlite` (crie keys de teste; NÃO copie de produção)
+- Tailwind v4 com `@theme inline` — CSS vars já no padrão; ver `src/app/globals.css`
+- Node: versão do package.json/lockfile; `npm ci` se node_modules incompleto

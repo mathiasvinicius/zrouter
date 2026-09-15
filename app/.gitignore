@@ -101,3 +101,10 @@ graphify-out/*
 .start-dev.ps1
 start-dev-silent.cjs
 debug.log
+
+# ZRouter local state (nunca subir)
+/.env
+.env.local
+jwt-secret*
+*-entrega*.log
+tmp/

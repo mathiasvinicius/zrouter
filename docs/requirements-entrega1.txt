@@ -1,0 +1,71 @@
+# REQUIREMENTS — Entrega 1 estendida do ZRouter (fontes por key)
+
+**Executor:** Prime Agent (provider 9router, modelo `ollama/glm-5.2`)
+**Repo de trabalho:** `/opt/containers/zrouter/app` (git limpo, branch atual)
+**Referências obrigatórias (leia antes de codar):**
+- `/opt/containers/zrouter/docs/infusion-design.md` — escopo travado; item 0 = requisito principal
+- `/opt/containers/zrouter/docs/roadmap.md` — Entrega 1 e fronteiras
+- `/opt/containers/omniroute-src/src/app/(dashboard)/dashboard/api-manager` e `.../tokens` — padrão visual dos modais
+- `/opt/containers/omniroute-src/src/app/(dashboard)/dashboard/health` e `.../free-tiers` — padrão visual dos cards
+
+## O QUE CONSTRUIR
+
+### A. Contrato comum de fontes (backend)
+
+1. Novo módulo `open-sse/sources/` (ou pasta equivalente ao layout do repo) com:
+   - `searchSources(apiKeyRow, query, scope, limit)` → array de:
+     `{sourceId, title, url, excerpt, updatedAt, bank, origin, score}`
+   - `getSource(apiKeyRow, id)` → `{sourceId, title, content, url, bank, origin}`
+   - `origin` ∈ `notion | open-notebook | neo4j`
+2. Três backends implementando o mesmo contrato:
+   - **Open Notebook**: REST em `http://127.0.0.1:5055`, header `Authorization: Bearer $OPEN_NOTEBOOK_PASSWORD` (env). Consulta `POST /api/search` com `{"query": q, "type": "vector", "limit": N}` e FILTRA resultados por notebooks autorizados na key ANTES de retornar. Timeout 10s; erros → lista vazia + log estruturado sem credencial.
+   - **Neo4j**: reutilizar o módulo de memória Neo4j existente (`IDENTITY_MEMORY_BACKEND=neo4j`), restringindo ao bank da key.
+   - **Notion**: stub read-only com a MESMA interface (retorna lista vazia + status `not-configured` até existir token em env `NOTION_TOKEN`).
+3. **Permissões por key (requisito principal):**
+   - Estender o schema SQLite de `apiKeys` com coluna `sources` (TEXT, JSON) — migration idempotente.
+   - Formato do JSON: `{"notion": {"enabled": bool, "pages": [...], "databases": [...]}, "open-notebook": {"enabled": bool, "notebooks": [...]}, "neo4j": {"enabled": bool, "banks": [...]}}`
+   - Em TODA busca: fontes não habilitadas na key não são consultadas; notebooks/banks fora do escopo não são retornados; erro 403 (não silêncio) se a key pedir escopo não autorizado explicitamente.
+
+### B. Modal de key expandido (frontend)
+
+4. No dashboard Next.js (`src/app`), a página de API keys existente ganha:
+   - Modal de criação/edição com nova seção **"Fontes de Conhecimento"**:
+     - Toggle por fonte (Notion / Open Notebook / Neo4j)
+     - Quando ligado: campos de escopo (IDs de pages/databases Notion; IDs de notebooks Open Notebook; banks Neo4j), um por linha, com botão +/× para adicionar/remover
+     - Botão **"Testar conexão"** por fonte → chama endpoint de status e mostra ✓/✗ + latência
+   - Padrão visual: seguir modais de `api-manager`/`tokens` do OmniRoute (mesmo dark theme, mesmos componentes de card/toggle/input). NÃO copiar páginas inteiras; extrair o padrão.
+5. Endpoint de status por fonte: `GET /api/sources/status?key=<id>` retorna `{notion: {configured, ok, latencyMs}, open-notebook: {...}, neo4j: {...}}` — usado pelo modal e pela página Fontes.
+
+### C. Página "Fontes" (frontend)
+
+6. Nova página no dashboard: **Fontes** — três cards (Notion, Open Notebook, Neo4j) com status, escopo configurado, contagem de keys ligadas, botão de teste e link para o modal da key. Padrão visual de `health`/`free-tiers`.
+
+### D. Persistência e migração
+
+7. Migration SQLite que adiciona `sources` a `apiKeys` (default `'{}'`), retrocompatível: keys antigas funcionam com `sources='{}'` (nenhuma fonte ligada).
+8. O painel de keys do dashboard deve salvar/carregar o campo `sources` no CRUD.
+
+## O QUE NÃO FAZER (trava de escopo)
+
+- NADA de gamificação, A2A, plugins, translator, leaderboards, sponsor banners
+- NÃO portar catálogo inteiro do OmniRoute; só os padrões visuais citados
+- NÃO embutir Open Notebook UI/SurrealDB/podcasts no ZRouter
+- NÃO escrever no Notion (read-only forever até decisão explícita)
+- NENHUMA credencial em logs, prompts ou respostas; NUNCA exibir `OPEN_NOTEBOOK_PASSWORD`, `NOTION_TOKEN` ou a apiKey na UI além do que já é padrão
+- NÃO reiniciar containers em produção; NÃO tocar no 9Router de 20128
+- Busca NÃO chama LLM — só retorna trechos citáveis
+
+## TESTES (obrigatórios antes de dar commit)
+
+1. Unitário do contrato: mock dos 3 backends; key sem fontes → vazio; key com notebook autorizado → só resultados do notebook; key pedindo escopo não autorizado → 403.
+2. Migration: rodar 2× idempotente; keys antigas preservadas.
+3. Endpoint de status: responde com Notion `not-configured`, Open Notebook ok (servidor real roda em 5055), Neo4j ok.
+4. Build: `npm run build` (ou equivalente do repo) passa sem erro de tipo/lint nas páginas novas.
+5. Commit único: `feat(sources): per-key sources + Fontes dashboard + modal (Entrega 1 estendida)`
+
+## AMBIENTE
+
+- Open Notebook real em `http://127.0.0.1:5055` (use para testar leitura de verdade; senha em `/opt/containers/open-notebook/.env` → `OPEN_NOTEBOOK_PASSWORD`)
+- Neo4j em `http://127.0.0.1:7474`, DB `neo4j`, creds em `/opt/containers/neo4j/.env`
+- SQLite do ZRouter: `/opt/containers/zrouter/data/db/data.sqlite` (NÃO copiar de produção; keys de teste você cria)
+- Node do repo: usar versão do `package.json`/lockfile; instalar deps com npm ci se node_modules ausente

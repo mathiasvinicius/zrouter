@@ -23,6 +23,7 @@ import EditCompatibleNodeModal from "./EditCompatibleNodeModal";
 import AddCustomModelModal from "./AddCustomModelModal";
 import BulkImportCodexModal from "./BulkImportCodexModal";
 import BulkImportGrokCliModal from "./BulkImportGrokCliModal";
+import ModelSyncControls from "./ModelSyncControls";
 
 const ONE_BY_ONE_DELAY_MS = 1000;
 
@@ -1729,6 +1730,7 @@ export default function ProviderDetailPage() {
             <h2 className="text-lg font-semibold">
               {"Available Models"}
             </h2>
+            <ModelSyncControls providerId={providerId} importAlias={providerStorageAlias} customModels={customModels} />
             {providerThinkingLevels && (
               <select
                 value={thinkingMode}

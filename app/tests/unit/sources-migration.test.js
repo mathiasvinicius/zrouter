@@ -49,7 +49,9 @@ describe("apiKeys.sources migration", () => {
     const row = db2.get(`SELECT sources FROM apiKeys WHERE id = 'legacy-1'`);
     expect(row.sources).toBe("{}");
     const meta = db2.get(`SELECT value FROM _meta WHERE key='schemaVersion'`);
-    expect(parseInt(meta.value, 10)).toBe(2);
+    // Entrega 2 appended migration #3 (custom-model-source); the contract is a
+    // monotonic chain that includes #2, not a pinned version.
+    expect(parseInt(meta.value, 10)).toBeGreaterThanOrEqual(2);
 
     // Third boot — still stable, no duplicate column errors.
     db2.close?.();

@@ -12,29 +12,29 @@
    Brand orange (dark) / soft coral (light), neutral warm bases
    ============================================================ */
 :root {
-  /* Brand scale (light) - centered on #E56A4A */
-  --color-brand-50: #fdf1ed;
-  --color-brand-100: #fadccf;
-  --color-brand-200: #f4b59c;
-  --color-brand-300: #ee8d6a;
-  --color-brand-400: #ea7855;
-  --color-brand-500: #E56A4A;
-  --color-brand-600: #cc5236;
-  --color-brand-700: #a64027;
-  --color-brand-800: #7a2f1d;
-  --color-brand-900: #4d1e12;
+  /* Brand scale (light) - ITMS palette centered on royal #033f7b */
+  --color-brand-50: #dce8f4;
+  --color-brand-100: #c4d9ec;
+  --color-brand-200: #9cc0df;
+  --color-brand-300: #5d94c4;
+  --color-brand-400: #1461a3;
+  --color-brand-500: #033f7b;
+  --color-brand-600: #032f60;
+  --color-brand-700: #07233b;
+  --color-brand-800: #051a2e;
+  --color-brand-900: #030f1d;
 
   /* Primary (legacy alias for backward compat with existing components) */
   --color-primary: var(--color-brand-500);
   --color-primary-hover: var(--color-brand-600);
 
   /* Surfaces & backgrounds (light) */
-  --color-bg: #FDFAF6;
-  --color-bg-alt: #F7F3EE;
+  --color-bg: #F7FAFD;
+  --color-bg-alt: #EEF4FA;
   --color-surface: #ffffff;
   --color-surface-2: #f4f4f5;
   --color-surface-3: #e7e7e9;
-  --color-sidebar: rgba(244, 241, 236, 0.85);
+  --color-sidebar: rgba(220, 232, 244, 0.60);
 
   /* Borders */
   --color-border: #e5e7eb;
@@ -70,31 +70,31 @@
 }
 
 .dark {
-  /* Brand scale (dark) - centered on #E56A4A, same as light for consistency */
-  --color-brand-50: #fdf1ed;
-  --color-brand-100: #fadccf;
-  --color-brand-200: #f4b59c;
-  --color-brand-300: #ee8d6a;
-  --color-brand-400: #ea7855;
-  --color-brand-500: #E56A4A;
-  --color-brand-600: #cc5236;
-  --color-brand-700: #a64027;
-  --color-brand-800: #7a2f1d;
-  --color-brand-900: #4d1e12;
+  /* Brand scale (dark) - ITMS palette centered on royal #033f7b */
+  --color-brand-50: #dce8f4;
+  --color-brand-100: #c4d9ec;
+  --color-brand-200: #9cc0df;
+  --color-brand-300: #5d94c4;
+  --color-brand-400: #1461a3;
+  --color-brand-500: #033f7b;
+  --color-brand-600: #032f60;
+  --color-brand-700: #07233b;
+  --color-brand-800: #051a2e;
+  --color-brand-900: #030f1d;
 
-  --color-primary: #E56A4A;
-  --color-primary-hover: #cc5236;
+  --color-primary: #5d94c4;
+  --color-primary-hover: #1461a3;
 
   /* Surfaces (dark - Claude-like neutral warm) */
-  --color-bg: #1a1a1a;
-  --color-bg-alt: #1F1F1E;
-  --color-surface: #262626;
-  --color-surface-2: #303030;
-  --color-surface-3: #3a3a3a;
-  --color-sidebar: rgba(30, 30, 30, 0.85);
+  --color-bg: #0e1621;
+  --color-bg-alt: #101a28;
+  --color-surface: #16233a;
+  --color-surface-2: #1c2b44;
+  --color-surface-3: #233452;
+  --color-sidebar: rgba(10, 18, 31, 0.88);
 
-  --color-border: #333333;
-  --color-border-subtle: #2a2a2a;
+  --color-border: #27405f;
+  --color-border-subtle: #1e3250;
 
   --color-text: #ededed;
   --color-text-main: #ededed;

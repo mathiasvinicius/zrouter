@@ -1,27 +1,50 @@
 <div align="center">
-  <img src="./images/9router.png?1" alt="9Router Dashboard" width="800"/>
+  <img src="./images/9router.png?1" alt="ZRouter Dashboard" width="800"/>
   
-  # 9Router - FREE AI Router & Token Saver
+  # ZRouter — Sovereign AI Gateway
+
+  **Self-hosted AI gateway with per-key knowledge sources, smart model routing and 40+ providers.**
+  Connect Claude Code, Codex, Cursor, Cline, Copilot and Antigravity through one OpenAI-compatible
+  endpoint — auto-fallback chains, RTK token saver (-40%), live quota tracking and per-key
+  knowledge sources (Open Notebook, Notion, Neo4j) with source-backed citations.
+
+  > Derived from **[9Router](https://github.com/decolua/9router)** (MIT) with selected features
+  > from **[OmniRoute](https://github.com/diegosouzapw/OmniRoute)** (MIT) — provider UX patterns
+  > and the color-theme system. Built by **[ITMS Solutions](https://github.com/mathiasvinicius)**.
+
   
   **Never stop coding. Save 20-40% tokens with RTK + auto-fallback to FREE & cheap AI models.**
   
   **Connect All AI Code Tools (Claude Code, Cursor, Antigravity, Copilot, Codex, Gemini, OpenCode, Cline, OpenClaw...) to 40+ AI Providers & 100+ Models.**
-  
-  [![npm](https://img.shields.io/npm/v/9router.svg)](https://www.npmjs.com/package/9router)
-  [![Downloads](https://img.shields.io/npm/dm/9router.svg)](https://www.npmjs.com/package/9router)
-  [![Docker Pulls](https://img.shields.io/docker/pulls/decolua/9router.svg?logo=docker&label=Docker%20pulls)](https://hub.docker.com/r/decolua/9router)
-  [![GHCR](https://img.shields.io/badge/GHCR-decolua%2F9router-blue?logo=github)](https://github.com/decolua/9router/pkgs/container/9router)
-  [![License](https://img.shields.io/npm/l/9router.svg)](https://github.com/decolua/9router/blob/main/LICENSE)
 
-<a href="https://trendshift.io/repositories/22628" target="_blank"><img src="https://trendshift.io/api/badge/repositories/22628" alt="decolua%2F9router | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
-[🚀 Quick Start](#-quick-start) • [💡 Features](#-key-features) • [📖 Setup](#-setup-guide) • [🌐 Website](https://9router.com)
 
 [🇧🇷 Português (Brasil)](./i18n/README.pt-BR.md) • [🇻🇳 Tiếng Việt](./i18n/README.vi.md) • [🇨🇳 中文](./i18n/README.zh-CN.md) • [🇯🇵 日本語](./i18n/README.ja-JP.md) • [🇷🇺 Русский](./i18n/README.ru.md) • [🇹🇭 ไทย](./i18n/README.th.md) • [🇮🇷 فارسی](./i18n/README.fa_IR.md) • [🇮🇩 Indonesia](./i18n/README.id-ID.md) • [🇪🇸 Español](./i18n/README.es.md) • [🇫🇷 Français](./i18n/README.fr.md)
 
 </div>
 
 ---
+
+---
+
+## Origens & Créditos
+
+O ZRouter nasce da fusão seletiva de dois projetos open-source que admiramos:
+
+| Projeto | O que herdamos | Licença |
+|---|---|---|
+| **[9Router](https://github.com/decolua/9router)** — by decolua | Núcleo do gateway: roteamento multi-provider, combos com fallback automático, RTK token saver, dashboard base, sistema de identidade por API key | MIT |
+| **[OmniRoute](https://github.com/diegosouzapw/OmniRoute)** | Padrões de UX de providers (descoberta/importação de modelos, sync automático), sistema de temas de cor, padrões de modais do api-manager | MIT |
+
+Tudo o mais foi construído ou adaptado para o ZRouter: o **contrato comum de fontes** (Open
+Notebook API, Notion read-only, Neo4j por bank), a **vinculação de fontes por API key** com
+modal expandido, a página **Fontes** e o tema visual **ITMS**.
+
+Ambos os projetos originais são MIT — atribuição preservada e merecidamente creditada.
+Contribuições de volta: [9Router](https://github.com/decolua/9router) · [Open Notebook](https://github.com/lfnovo/open-notebook)
+
+---
+
 
 ## 🤔 Why 9Router?
 

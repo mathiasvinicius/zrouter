@@ -11,7 +11,7 @@ export default function Footer() {
               <div className="size-6 rounded bg-[#f97815] flex items-center justify-center text-white">
                 <span className="material-symbols-outlined text-[16px]">hub</span>
               </div>
-              <h3 className="text-white text-lg font-bold">9Router</h3>
+              <h3 className="text-white text-lg font-bold">ZRouter</h3>
             </div>
             <p className="text-gray-500 text-sm max-w-xs mb-6">
               The unified endpoint for AI generation. Connect, route, and manage your AI providers with ease.

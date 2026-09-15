@@ -429,6 +429,18 @@ export async function buildModelsList(kindFilter, options = {}) {
         rawModelIds = await fetchCompatibleModelIds(conn);
       }
 
+      // Entrega 2: compatible providers serve their whole upstream catalog
+      // (discovered via "Importar de /models") as custom models. Feed them into
+      // the same merged pipeline so discovered ids route without static entries.
+      if (isCompatibleProvider && rawModelIds.length === 0) {
+        for (const customModel of customModels) {
+          if (!customModel?.id) continue;
+          if (customModel.providerAlias !== staticAlias && customModel.providerAlias !== providerId) continue;
+          if ((getModelKind(customModel) || LLM_KIND) !== LLM_KIND) continue;
+          rawModelIds.push(String(customModel.id));
+        }
+      }
+
       // Config-driven live catalog override (e.g. Kiro returns dynamic
       // -thinking/-agentic variants per account). On failure, fall back to
       // whatever rawModelIds already holds.

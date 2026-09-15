@@ -1,26 +1,98 @@
 name: zrouter
 
+# ZRouter — Sovereign AI Gateway (ITMS Solutions)
+# Baseado em 9Router (MIT, github.com/decolua/9router) + OmniRoute (MIT)
+#
+# Start básico (só o gateway):
+#   docker compose up -d
+#
+# Com fontes de conhecimento (Neo4j + Open Notebook):
+#   cp .env.example .env   (edite as senhas!)
+#   docker compose --profile extras up -d
+
 services:
+  # ── Core ──────────────────────────────────────────────────────
   zrouter:
     build:
       context: ./app
       dockerfile: Dockerfile
-    image: zrouter:dev
+    image: zrouter:latest
     container_name: zrouter
     restart: unless-stopped
     network_mode: host
     env_file:
       - ./.env
-      - /opt/containers/neo4j/.env
-      - /opt/containers/open-notebook/.env
-    volumes:
-      - ./data:/app/data
     environment:
       DATA_DIR: /app/data
       PORT: "20129"
-      # Expose only on the host interfaces (firewall/Tailscale policy controls access).
-      HOSTNAME: 0.0.0.0
+      HOSTNAME: "0.0.0.0"
       NODE_ENV: production
-      IDENTITY_MEMORY_BACKEND: neo4j
-      NEO4J_HTTP_URL: http://127.0.0.1:7474
-      NEO4J_DATABASE: neo4j
+      # Fontes opcionais: preencha no .env e ative o profile "extras"
+      # (defaults assumem os containers abaixo na rede host)
+      NEO4J_HTTP_URL: ${NEO4J_HTTP_URL:-http://127.0.0.1:7474}
+      NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      OPEN_NOTEBOOK_URL: ${OPEN_NOTEBOOK_URL:-http://127.0.0.1:5055}
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      neo4j:
+        condition: service_started
+        required: false
+      open-notebook:
+        condition: service_started
+        required: false
+
+  # ── Fontes de conhecimento (profile: extras) ──────────────────
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: zrouter-neo4j
+    profiles: ["extras"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/change-me-neo4j}
+      NEO4J_server_memory_heap_max__size: 2G
+      NEO4J_server_memory_heap_initial__size: 512M
+      NEO4J_server_memory_pagecache_size: 1G
+    volumes:
+      - ./data/neo4j:/data
+      - ./data/neo4j-logs:/logs
+
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    container_name: zrouter-surrealdb
+    profiles: ["extras"]
+    restart: unless-stopped
+    # Open Notebook usa rocksdb local; credenciais fortes via .env
+    command: ["start", "--log", "info", "--user", "${SURREAL_USER:-open_notebook}", "--pass", "${SURREAL_PASSWORD:-change-me-surreal}", "rocksdb:/mydata/mydatabase.db"]
+    user: root
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    volumes:
+      - ./data/surrealdb:/mydata
+
+  open-notebook:
+    image: lfnovo/open_notebook:v1-latest
+    container_name: zrouter-open-notebook
+    profiles: ["extras"]
+    restart: unless-stopped
+    ports:
+      - "5055:5055"
+      - "8502:8502"
+    depends_on:
+      - surrealdb
+    environment:
+      OPEN_NOTEBOOK_ENCRYPTION_KEY: ${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-me-32-chars-minimum-secret}
+      SURREAL_URL: ws://surrealdb:8000/rpc
+      SURREAL_USER: ${SURREAL_USER:-open_notebook}
+      SURREAL_PASSWORD: ${SURREAL_PASSWORD:-change-me-surreal}
+      SURREAL_NAMESPACE: open_notebook
+      SURREAL_DATABASE: open_notebook
+      # LLM/embeddings via 9Router (ou qualquer endpoint OpenAI-compatible)
+      # Configure providers no dashboard na primeira execução
+    volumes:
+      - ./data/open-notebook:/app/data
