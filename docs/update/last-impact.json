@@ -1,0 +1,25 @@
+{
+  "base": "zrouter-base-v0.5.75",
+  "target": "upstream/master",
+  "upstreamTouched": 23,
+  "ourCustomFiles": 78,
+  "collisions": [
+    ".gitignore",
+    "open-sse/executors/index.js",
+    "open-sse/providers/registry/xiaomi-mimo.js",
+    "open-sse/services/usage.js",
+    "open-sse/translator/concerns/paramSupport.js",
+    "src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js",
+    "src/app/(dashboard)/dashboard/providers/[id]/page.js",
+    "src/app/api/cli-tools/claude-settings/route.js",
+    "src/app/api/oauth/[provider]/[action]/route.js",
+    "src/lib/db/driver.js",
+    "src/lib/oauth/constants/oauth.js",
+    "src/lib/oauth/utils/server.js",
+    "src/shared/components/index.js"
+  ],
+  "collisionCount": 13,
+  "inertCount": 10,
+  "clean": false,
+  "verdict": "ATENÇÃO — 13 arquivo(s) customizado(s) mudaram nos dois lados"
+}
