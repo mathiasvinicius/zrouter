@@ -1,0 +1,212 @@
+# REQUIREMENTS — Entrega 5: Bootstrap do Neo4j (instalação reproduzível do repo público)
+
+**Repo:** `/opt/containers/zrouter` — **público** em `github.com/mathiasvinicius/zrouter`
+**Ambiente dev:** container na 20129. **PRODUÇÃO em 20128 e o Neo4j de produção — NÃO TOCAR.**
+
+---
+
+## PROBLEMA
+
+Quem clonar o repositório público e subir com `--profile bundled` vai ter um Neo4j **vazio
+e sem otimização**. As otimizações que existem no servidor do dono **não estão no repositório**,
+então a instalação de terceiros roda degradada — ou não funciona.
+
+Inventário do que existe no servidor do dono mas **NÃO** está versionado:
+
+| Otimização | Existe no servidor? | Está no repo? |
+|---|---|---|
+| Índice `mem_bank` (Memory.bank) — usado por TODA query de recall | sim | **não** |
+| Índice `mem_id` (Memory.id) + constraint UNIQUENESS | sim | **não** |
+| Índice `ent_bank` (Entity.bank) | sim | **não** |
+| Índice `ent_name` (Entity.name) + constraint UNIQUENESS | sim | **não** |
+| Plugin APOC + permissões (`apoc.*`) | sim | não (parcial) |
+| Tuning de memória (heap 2G / pagecache 1G) | sim | não |
+| JVM flags (G1GC, ExitOnOutOfMemoryError) | sim | não |
+| Healthcheck | sim | não |
+| `BANK_ID_PATTERN` (defesa contra injeção Cypher) | sim (código) | sim ✓ |
+
+**Prova do gap:** `grep -rn "CREATE INDEX\|CREATE CONSTRAINT" src/lib/identityMemory/ open-sse/`
+→ **vazio**. Ninguém cria o schema. O Neo4j do dono tem os índices porque foram criados
+manualmente/há muito tempo. Uma instalação limpa não terá nenhum.
+
+**Impacto:** sem `mem_bank` e `ent_*`, o recall faz full scan — exatamente o que degrada a
+experiência de quem instala. Sem `mem_id` UNIQUE, o `MERGE` de memória pode duplicar.
+
+---
+
+## PARTE A — Bootstrap de schema idempotente (código)
+
+### A1. Nova função de inicialização
+Crie `src/lib/identityMemory/schema.js` com uma função exportada que garanta o schema:
+
+```js
+export async function ensureNeo4jSchema() { ... }
+```
+
+Deve emitir, **idempotentes** (o Neo4j aceita `IF NOT EXISTS`):
+
+```cypher
+CREATE CONSTRAINT mem_id IF NOT EXISTS FOR (m:Memory) REQUIRE m.id IS UNIQUE;
+CREATE CONSTRAINT ent_name IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE;
+CREATE INDEX mem_bank IF NOT EXISTS FOR (m:Memory) ON (m.bank);
+CREATE INDEX ent_bank IF NOT EXISTS FOR (e:Entity) ON (e.bank);
+CREATE INDEX mem_fact_type IF NOT EXISTS FOR (m:Memory) ON (m.fact_type);
+CREATE INDEX mm_bank IF NOT EXISTS FOR (mm:MentalModel) ON (mm.bank);
+CREATE INDEX bank_id IF NOT EXISTS FOR (b:Bank) ON (b.id);
+```
+
+- Use a mesma função `execute`/`statement` já usada em `neo4j.js` (não invente transporte)
+- **Ordem:** os índices antes das constraints? Não — na prática qualquer ordem funciona com
+  `IF NOT EXISTS`, mas **descubra e documente** se houver dependência (teste contra o Neo4j real)
+- **Tolerante a falha:** Neo4j Community aceita todas essas sintaxes. Se alguma falhar
+  (versão antiga), log estruturado e **continue** — não derrube o boot
+- **Nunca destrutivo:** somente `IF NOT EXISTS` e `CREATE`. Proibido `DROP`, `DELETE`, `SET`
+  em nós existentes
+
+### A2. Quando executar
+- No **boot do zrouter**, de forma assíncrona e não-bloqueante: se o Neo4j estiver
+  indisponível, o gateway **deve subir normalmente** (o recall já é fail-open).
+  Encaixe onde o `initDb()` do SQLite é chamado — procure `src/lib/db/migrate.js` /
+  `initDb` e siga o mesmo padrão de erro.
+- **Não** a cada requisição. Uma vez por processo, com guarda de "já rodou" em memória.
+
+### A3. Expor um endpoint de verificação (útil para quem instala)
+`GET /api/health/neo4j` → `{ connected: bool, indexes: [...], constraints: [...], missing: [...] }`
+usando `SHOW INDEXES` / `SHOW CONSTRAINTS`. **Sem credenciais na resposta.** Serve para o
+dono de outra instalação confirmar que o schema foi aplicado.
+
+### A4. Testes
+- `tests/unit/neo4j-schema.test.js`:
+  - `ensureNeo4jSchema` emite as 7 declarações esperadas, todas com `IF NOT EXISTS`
+  - nenhuma declaração contém `DROP` / `DELETE` / `MATCH ... SET` (guarda anti-destrutiva)
+  - falha do Neo4j no meio → não lança, segue (fail-open)
+  - guarda de "roda uma vez" funciona (segunda chamada é no-op)
+
+---
+
+## PARTE B — Otimizações no compose embutido
+
+Tudo isto vai no serviço `neo4j` do `docker-compose.yml` **versionado** (o que está atrás do
+profile `bundled`), replicando o que funciona no servidor do dono:
+
+```yaml
+  neo4j:
+    image: neo4j:5.26-community
+    profiles: ["bundled"]
+    container_name: zrouter-neo4j          # NUNCA "neo4j" puro (colide)
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/change-me-neo4j}
+      # ── memória (ajustada para um host modesto; veja nota abaixo)
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX:-2G}
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INITIAL:-512M}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE:-1G}
+      # ── JVM
+      NEO4J_server_jvm_additional: "-XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+    volumes:
+      - ./data/neo4j:/data
+      - ./data/neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+```
+
+**APOC: NÃO incluir.** Verificado — `grep -rn "apoc\." src/ open-sse/` retorna **vazio**: o
+código do ZRouter não usa nenhum procedimento APOC. O servidor do dono tem o jar porque
+outros serviços o aproveitam, mas uma instalação do ZRouter não precisa dele. Não carregue
+dependência inútil: nada de download de jar, nada de `Dockerfile.neo4j`, nada de
+`NEO4J_dbms_security_procedures_*`. **Não reintroduza essas variáveis.**
+
+**Memória adaptável:** os valores acima são para hospedar em máquina modesta. Deixe
+parametrizáveis (feito) e documente no `.env.example` que hosts pequenos (≤4GB) devem baixar
+para `512M/256M/512M`. **Não** assuma o host de 27GB do dono.
+
+---
+
+## PARTE C — `.env.example` e README para quem instala
+
+### C1. `.env.example` — seção Neo4j completa
+Incluir TODAS as variáveis que o código lê. Isto foi verificado no código-fonte (não chute):
+`NEO4J_AUTH`, `NEO4J_HTTP_URL`, `NEO4J_DATABASE`, `NEO4J_USER`, `NEO4J_PASSWORD`,
+`NEO4J_RECALL_LIMIT`, `NEO4J_RECALL_MAX_CHARS`, `NEO4J_RECALL_DEDUP_TTL_MS`,
+`NEO4J_RETAIN_DEDUP_TTL_MS`, mais as novas de memória do Neo4j
+(`NEO4J_HEAP_MAX`, `NEO4J_HEAP_INITIAL`, `NEO4J_PAGECACHE`).
+Com comentário curto por variável e valores default funcionais.
+
+### C2. README — seção "Instalação" veraz
+Deve descrever exatamente os dois modos (já desenhados na Entrega 4) e incluir:
+1. **Pré-requisitos:** Docker + Compose; RAM mínima sugerida
+2. **Modo A (stack completo):** `cp .env.example .env` (trocar as senhas!) →
+   `docker compose --profile bundled up -d` → abrir `http://localhost:20129`
+3. **Modo B (usar Neo4j/Open Notebook existentes):** apontar `NEO4J_HTTP_URL` e
+   `OPEN_NOTEBOOK_URL` → `docker compose up -d`
+4. **Verificação pós-instalação:** `curl http://localhost:20129/api/health/neo4j` e o que
+   esperar na resposta
+5. **Aviso de segurança:** trocar TODAS as senhas default; não expor as portas na internet
+   (usar Tailscale/VPN para acesso remoto)
+6. **Aviso de escopo:** nenhum dado do autor é distribuído — o banco nasce vazio; o schema
+   (índices/constraints) é criado automaticamente no primeiro boot
+
+⚠️ O README **não pode** conter host, IP, credencial ou caminho do servidor do dono.
+Nada de `<host-remoto>`, `zenith`, `(senha removida)`, `/opt/containers/...`.
+
+---
+
+## PARTE D — Verificação (obrigatória, com output real)
+
+### D1. Schema aplica num Neo4j limpo?
+**Não use o Neo4j de produção.** Suba um Neo4j descartável em porta livre e teste contra ele:
+
+```bash
+docker run -d --rm --name neo4j-schema-test \
+  -p 127.0.0.1:17474:7474 -p 127.0.0.1:17687:7687 \
+  -e NEO4J_AUTH=neo4j/testpass123 neo4j:5.26-community
+# aguarde o boot, então rode a função de schema contra http://127.0.0.1:17474
+# e cole o SHOW INDEXES / SHOW CONSTRAINTS ANTES e DEPOIS
+```
+Prove: **antes** = vazio; **depois** = os 7 objetos criados. Depois **remova o container**.
+
+### D2. Recall acelera com índice?
+Se conseguir semear poucas memórias no Neo4j descartável, rode `EXPLAIN` na query de recall
+e mostre a diferença (usando índice vs. scan). Se não for viável, diga — **não invente plano**.
+
+### D3. Compose
+```bash
+cd /opt/containers/zrouter
+docker compose config --services                    # só zrouter
+docker compose --profile bundled config --services  # inclui neo4j
+docker compose --profile bundled config --quiet     # YAML válido
+docker compose --profile bundled config | grep -A12 'neo4j:'   # confirme as otimizações
+```
+
+---
+
+## O QUE NÃO FAZER
+
+- **NÃO** tocar no Neo4j de produção (`/opt/containers/neo4j`, container `neo4j`) nem rodar
+  qualquer `CREATE`/`DROP`/`SET` contra ele
+- **NÃO** tocar no 9Router (porta 20128) nem no SQLite de produção
+- **NÃO** rodar `docker compose up -d` no projeto do zrouter (só `config`)
+- **NÃO** usar `DROP` / `DELETE` no código de schema — apenas `CREATE ... IF NOT EXISTS`
+- **NÃO** colocar IP, host, caminho ou credencial do servidor do dono no README/compose
+- **NÃO** embutir dado algum do autor (o banco de terceiros nasce vazio — é o esperado)
+- **NÃO** commitar `.env`, `docker-compose.override.yml`, `data/`, `*.log`
+- **NÃO** fazer push — EVE revisa e publica
+- **NÃO** mexer nos 6 imports mortos de `src/lib/oauth/services/*.js`
+
+## AO FINAL, IMPRIMA
+
+(a) arquivos criados/alterados, uma linha cada
+(b) output REAL do teste de schema (SHOW INDEXES/CONSTRAINTS antes e depois) no Neo4j descartável
+(c) output do teste de EXPLAIN, se viável
+(d) verificação do compose (D3)
+(e) saída das suítes de teste e do build
+(f) hash do commit
+(g) decisão sobre o APOC, com a justificativa
+(h) o que você NÃO conseguiu fazer

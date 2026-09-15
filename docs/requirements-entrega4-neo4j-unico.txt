@@ -1,0 +1,347 @@
+# REQUIREMENTS — Entrega 4: Neo4j como backend único + dependências embutidas no compose
+
+**Repo:** `/opt/containers/zrouter` (raiz), código em `./app`
+**Ambiente dev:** container na porta 20129. **PRODUÇÃO em 20128 — NÃO TOCAR.**
+
+---
+
+## CONTEXTO / DECISÕES DO DONO
+
+1. **Só Neo4j.** O backend Hindsight não deve ir para o ZRouter — consome tokens demais
+   (ele sintetiza/resume memória via LLM). O ZRouter usa **exclusivamente Neo4j** para memória
+   de identidade. O suporte a Hindsight deve ser **removido do ZRouter**; qualquer chave
+   configurada com `memoryBackend: "hindsight"` deve migrar/fallback para `neo4j`.
+2. **Dependências embutidas no compose.** O `docker-compose.yml` do ZRouter deve trazer o
+   Neo4j (e demais fontes) **já declarados**, de forma que clonar + `docker compose up -d`
+   já suba o que é necessário. Hoje elas estão atrás do profile `extras` e o core não as traz.
+
+---
+
+## ⚠️ RESTRIÇÃO CRÍTICA DE AMBIENTE (leia antes de mexer no compose)
+
+Neste servidor **já existe um Neo4j de produção rodando**:
+
+- container `neo4j` (imagem `neo4j:5.26-community`), `Up` há dias, **healthy**
+- compose em `/opt/containers/neo4j/docker-compose.yml` (projeto `neo4j`)
+- já publica `0.0.0.0:7474` e `0.0.0.0:7687`
+- contém ~30k nós `Memory` e o bank `ViniciusMathias` — **dados reais, insubstituíveis**
+
+O `docker-compose.override.yml` local do ZRouter já injeta as credenciais desse Neo4j no
+container do zrouter. Se o compose embutido tentar subir um segundo Neo4j na mesma porta,
+o `up` quebra ou derruba o serviço de produção.
+
+**Solução obrigatória:** as dependências do compose ficam atrás do profile **`bundled`**
+(opt-in) e os `depends_on` usam `required: false`. Assim, `docker compose up -d` neste
+servidor sobe **somente o zrouter**, que continua falando com o Neo4j de produção via
+`NEO4J_HTTP_URL`. Detalhes completos e comandos de verificação na **Parte C**.
+
+Não use o override para "desativar" serviços — o profile resolve isso de forma portável
+(funciona em qualquer máquina, não só nesta).
+
+---
+
+## PARTE A — Remover o backend Hindsight
+
+### A1. Inventário (13 arquivos — verificado)
+```
+src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js
+src/app/api/keys/[id]/memories/route.js
+src/app/api/keys/[id]/route.js
+src/app/api/keys/route.js
+src/lib/db/repos/apiKeysRepo.js
+src/lib/db/index.js
+src/lib/db/migrate.js
+src/lib/db/schema.js
+src/lib/identityMemory/hindsight.js
+src/lib/identityMemory/index.js
+src/lib/identityMemory/neo4j.js
+src/lib/identityMemory/profileConfig.js
+src/sse/handlers/chat.js
+```
+
+### A2. Mudanças no core da memória
+- `src/lib/identityMemory/index.js`: remova o import de `./hindsight.js` e a entrada do mapa
+  `IMPLEMENTATIONS`. `getDefaultMemoryBackend()` deve retornar **`"neo4j"`** (não `"hindsight"`).
+  `getMemoryBackend(profile)` deve **coagir qualquer valor herdado** (`hindsight`, vazio,
+  desconhecido) para `neo4j` — log estruturado uma vez por valor, sem vazar dados.
+- `src/lib/identityMemory/profileConfig.js`: `MEMORY_BACKENDS` passa a ser só `["neo4j"]`.
+  Preserve a regra de validação do `bankId` (`BANK_ID_PATTERN`) — é defesa contra injeção
+  em Cypher, não remova.
+  **Compatibilidade:** uma requisição/registro antigo com `memoryBackend: "hindsight"` NÃO pode
+  resultar em erro — normalize para `neo4j` silenciosamente (uma linha de log).
+- `src/lib/identityMemory/hindsight.js`: **remover o arquivo**. Antes, confirme que nada mais
+  o importa (`grep -rn "hindsight.js"` em `src/` e `open-sse/`). Se algo importar, ajuste.
+- `src/lib/identityMemory/neo4j.js`: **implementar de verdade** `ensureBank` e `ensureMentalModel`
+  (ver Parte B — hoje são no-op).
+
+### A3. Remover Hindsight das superfícies
+- `src/lib/db/schema.js` / `migrate.js`: o campo `memoryBackend` continua existindo (histórico),
+  mas o default e os valores válidos passam a ser `neo4j`. **Não** remova a coluna (migração
+  destrutiva quebra bancos existentes) — só restrinja os valores e ajuste o default.
+- `src/app/api/keys/route.js` e `src/app/api/keys/[id]/route.js`: remova `hindsight` das
+  respostas/validações; aceite e normalize para `neo4j`.
+- `src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js`: remova a opção Hindsight do
+  seletor de backend — deve restar só Neo4j.
+- `src/app/api/keys/[id]/memories/route.js` e `src/lib/db/repos/apiKeysRepo.js` /
+  `src/lib/db/index.js`: limpe referências mortas a Hindsight.
+- `src/sse/handlers/chat.js`: a chamada de recall não pode mais rotear para Hindsight.
+
+### A4. Migração de dados existentes
+Chaves no SQLite do ZRouter com `memoryBackend='hindsight'` (há pelo menos uma — a criada
+nos testes) devem virar `neo4j`. Faça via **migration idempotente nova** (versão 4, seguindo
+o padrão da 002/003): `UPDATE apiKeys SET memoryBackend='neo4j' WHERE memoryBackend IS NULL
+OR memoryBackend NOT IN ('neo4j')`. Preserve `hindsightBankId` (o nome do campo fica — é a
+coluna do bank id; renomear seria migração destrutiva desnecessária; documente isso no código).
+
+---
+
+## PARTE B — Criar o Bank no Neo4j de verdade (pedido do dono)
+
+Hoje `ensureBank` em `neo4j.js` **não cria nada**:
+```js
+export async function ensureBank(bankId, name) {
+  const bank = validateBankId(bankId);
+  return { id: bank, name: name || bank };   // ← no-op, não toca no Neo4j
+}
+```
+Consequência: criar uma chave com um bank novo **não registra o bank no Neo4j**.
+
+### B1. `ensureBank` real
+Use **MERGE**, nunca CREATE — banks existentes têm dados e não podem ser sobrescritos:
+
+```cypher
+MERGE (b:Bank {id: $bank})
+ON CREATE SET b.name = $name, b.source = 'zrouter', b.created_at = $now
+RETURN b.id AS id, b.name AS name, b.created_at AS created_at
+```
+
+- `MERGE` na chave `id` (é o que o recall usa: `Memory.bank` casa com `Bank.id`)
+- `ON CREATE` **somente** — se o bank já existe (ex.: `ViniciusMathias`, com `mission`,
+  `background`, `disposition_json`, `config_json`, `overrides_json`), **não toque em nada**
+- Envolva em try/catch: falha ao criar o bank **não pode** impedir a criação da chave
+  (log estruturado, segue o fluxo)
+
+### B2. `ensureMentalModel` real
+Mesmo princípio:
+```cypher
+MERGE (mm:MentalModel {bank: $bank, id: $id})
+ON CREATE SET mm.content = '', mm.created_at = $now, mm.source = 'zrouter'
+RETURN mm.id AS id
+```
+- Shape: `MentalModel` tem `bank` + `id` e é lido em `mentalModelForProfile()` — confira no
+  código antes de escrever
+- `ON CREATE` apenas; mental models existentes (há 17) não podem ser sobrescritos
+- try/catch, fail-open igual ao B1
+
+### B3. Onde chamar
+- **Criação** (`POST /api/keys`): já chama `ensureBank`/`ensureMentalModel` — passa a funcionar
+  de verdade com B1/B2. Confirme que o bank usado é o `hindsightBankId` resolvido.
+- **Edição** (`PATCH /api/keys/[id]`): verifique se hoje chama `ensureBank` quando o bank
+  muda. **Se não chamar, adicione** — trocar o bank de uma chave existente deve criar o novo
+  bank no Neo4j. Este é um requisito explícito do dono.
+
+### B4. Testes (obrigatórios)
+- `tests/unit/ensure-bank-neo4j.test.js`:
+  - `ensureBank` emite `MERGE ... ON CREATE SET` (asserção no statement, sem precisar de Neo4j real)
+  - bank existente → a query **não** contém `SET b.mission` nem sobrescrita de campo existente
+  - falha do Neo4j → não lança, retorna/segue (fail-open)
+  - `ensureMentalModel` idem
+- `tests/unit/memory-backend-migration.test.js`:
+  - migration 004 converte `hindsight` → `neo4j` em linhas existentes
+  - idempotente (rodar duas vezes não altera nada além da primeira)
+  - `hindsightBankId` preservado após a migração
+  - registro com `memoryBackend: "hindsight"` é normalizado para `neo4j` sem erro
+
+---
+
+## PARTE C — Dependências embutidas, mas NÃO obrigatórias (correção do dono)
+
+**Princípio:** o repo traz as dependências **declaradas e prontas**, mas **subir é opt-in**.
+Um deployment remoto (ex.: uma VPS que usa o Neo4j do zion-server pela rede) deve ser capaz
+de rodar **só o zrouter**, apontando para um Neo4j externo — sem precisar remover nada do
+compose nem editar arquivo nenhum.
+
+### C1. `docker-compose.yml` (versionado) — bundled atrás de um profile
+
+Este é o **único** comportamento correto e já foi validado com `docker compose config`:
+
+```yaml
+services:
+  zrouter:
+    # ...
+    environment:
+      # Aponta para QUALQUER Neo4j — local, bundled ou remoto (Tailscale/LAN).
+      # Em uma VPS: NEO4J_HTTP_URL=http://<host-remoto>:7474 (o zion-server)
+      NEO4J_HTTP_URL: ${NEO4J_HTTP_URL:-http://127.0.0.1:7474}
+      NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
+      OPEN_NOTEBOOK_URL: ${OPEN_NOTEBOOK_URL:-http://127.0.0.1:5055}
+    depends_on:
+      neo4j:
+        condition: service_started
+        required: false        # ← ausente do projeto NÃO bloqueia o zrouter
+      open-notebook:
+        condition: service_started
+        required: false
+
+  neo4j:
+    image: neo4j:5.26-community
+    profiles: ["bundled"]        # ← opt-in: NÃO sobe por padrão
+    # ...
+
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    profiles: ["bundled"]
+
+  open-notebook:
+    image: lfnovo/open_notebook:v1-latest
+    profiles: ["bundled"]
+```
+
+**Comportamento resultante (validado):**
+- `docker compose up -d` → sobe **só o zrouter** (usa o Neo4j que o `NEO4J_HTTP_URL` apontar)
+- `docker compose --profile bundled up -d` → sobe o stack completo
+- `required: false` no `depends_on` garante que a ausência dos serviços do profile
+  **não impeça** o zrouter de subir (verificado: `docker compose config` aceita o serviço
+  ausente com `required: false`)
+
+Outros requisitos do compose:
+- Portas com bind em **`127.0.0.1`**, nunca `0.0.0.0` — exceto se o dono pedir exposição
+  explícita. Para uso remoto via Tailscale, o IP do Tailscale já dá o acesso.
+- **Sem `container_name` colidindo**: use `zrouter-neo4j`, nunca `neo4j` puro (no zion-server
+  já existe um container chamado `neo4j` de produção)
+- `healthcheck` no Neo4j copiando a abordagem do compose de produção
+  (`/opt/containers/neo4j/docker-compose.yml`), que funciona
+- Defaults seguros em todas as credenciais (`${VAR:-change-me-...}`)
+
+### C2. `docker-compose.override.yml` (NÃO versionado) — só o necessário neste servidor
+
+Não use o override para "desativar" serviços — o profile já cuida disso. O override existe
+apenas para injetar, **neste servidor**, as credenciais das fontes já existentes:
+
+```yaml
+services:
+  zrouter:
+    env_file:
+      - ./.env
+      - /opt/containers/neo4j/.env
+      - /opt/containers/open-notebook/.env
+```
+
+⚠️ Se o arquivo já tiver mais conteúdo, **preserve** — só garanta que esses `env_file`
+estejam presentes.
+
+### C3. `.env.example` — documentar os dois modos
+
+Deixe explícito, com exemplos:
+
+```bash
+# ── Como o zrouter encontra o Neo4j ─────────────────────────────
+# Modo A — stack completo nesta máquina:
+#   docker compose --profile bundled up -d
+#   NEO4J_HTTP_URL=http://127.0.0.1:7474
+#
+# Modo B — usando um Neo4j que já existe (outra máquina, ex.: zion-server):
+#   docker compose up -d          # sobe só o zrouter
+#   NEO4J_HTTP_URL=http://<host-remoto>:7474
+#
+# O acesso remoto usa a rede Tailscale; não exponha o Neo4j na internet.
+NEO4J_HTTP_URL=http://127.0.0.1:7474
+NEO4J_DATABASE=neo4j
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=change-me-neo4j
+
+# As mesmas regras valem para o Open Notebook (Modo B):
+# OPEN_NOTEBOOK_URL=http://<host-remoto>:5055
+```
+
+### C4. Verificação obrigatória (faça de verdade, cole o output)
+
+```bash
+cd /opt/containers/zrouter
+
+# 1) default: SÓ o zrouter (opt-in do bundled)
+docker compose config --services
+
+# 2) com o profile: stack completo
+docker compose --profile bundled config --services
+
+# 3) YAML válido nos dois modos
+docker compose config --quiet
+docker compose --profile bundled config --quiet
+
+# 4) o profile existe e está declarado
+docker compose config --profiles
+
+# 5) a URL do Neo4j é parametrizável (prove com um valor remoto)
+NEO4J_HTTP_URL=http://<host-remoto>:7474 docker compose config | grep NEO4J_HTTP_URL
+```
+
+⚠️ **NÃO** rode `docker compose up -d` neste servidor — só `config`.
+O objetivo é o arquivo correto + verificação estática. O restart é feito por EVE/dono.
+
+---
+
+## PARTE D — Testes, build, commit
+
+### Suítes que DEVEM continuar verdes
+```
+cd app/tests
+export $(grep -E '^NEO4J_' /opt/containers/neo4j/.env | xargs)
+npx vitest run --config vitest.config.js \
+  unit/sources-contract.test.js unit/sources-migration.test.js unit/sources-status.test.js \
+  unit/sources-opennotebook-real.test.js unit/color-themes.test.js \
+  unit/model-discover-endpoint.test.js unit/model-auto-sync.test.js \
+  unit/antigravity-oauth-client.test.js unit/react-hook-imports.test.js \
+  unit/ensure-bank-neo4j.test.js unit/memory-backend-migration.test.js
+```
+
+### Build
+```
+cd app && npm run build
+```
+
+### Commit único
+```
+feat(memory): Neo4j as the only identity backend; bundle deps as opt-in
+
+The owner does not want Hindsight in ZRouter — it leans on LLM synthesis and
+burns tokens. ZRouter now uses Neo4j exclusively.
+
+- drop the Hindsight implementation; any inherited "hindsight" value is coerced
+  to "neo4j" (log once, never error)
+- migration 004 rewrites existing rows to neo4j, preserving the bank id column
+- ensureBank/ensureMentalModel actually create nodes now (MERGE ... ON CREATE,
+  never overwriting an existing bank), on both key creation and bank change
+- docker-compose.yml declares Neo4j + Open Notebook + SurrealDB behind the
+  opt-in "bundled" profile: `up -d` runs only the gateway, `--profile bundled`
+  brings the full stack. NEO4J_HTTP_URL / OPEN_NOTEBOOK_URL point anywhere
+  (local, bundled, or a remote host over Tailscale), and depends_on uses
+  required:false so a missing dependency never blocks startup
+- tests: ensure-bank-neo4j, memory-backend-migration
+```
+
+---
+
+## O QUE NÃO FAZER
+
+- **NÃO** tocar no Neo4j de produção (`/opt/containers/neo4j/`, container `neo4j`) nem no
+  9Router (porta 20128, seu SQLite)
+- **NÃO** rodar `docker compose up -d` neste servidor — só `config` (verificação estática)
+- **NÃO** apagar volume, rodar `down -v`, ou qualquer operação destrutiva
+- **NÃO** usar `CREATE` no lugar de `MERGE` para Bank/MentalModel — sobrescreveria dados reais
+- **NÃO** renomear a coluna `hindsightBankId` (é o bank id; renomear = migração destrutiva)
+- **NÃO** remover a validação `BANK_ID_PATTERN` (protege contra injeção em Cypher)
+- **NÃO** commitar `.env`, `docker-compose.override.yml`, `data/`, `*.log`
+- **NÃO** fazer push — EVE revisa e publica
+- **NÃO** mexer nos 6 imports mortos de `src/lib/oauth/services/*.js`
+
+## AO FINAL, IMPRIMA
+
+(a) arquivos criados/alterados/removidos, uma linha cada
+(b) output REAL dos comandos de verificação do compose (C4), incluindo a simulação sem override
+(c) saída das suítes de teste
+(d) resultado do build
+(e) hash do commit
+(f) o que você NÃO conseguiu fazer
