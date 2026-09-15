@@ -47,8 +47,6 @@
       "loadProjectApiUrl": "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
       "tokenUrl": "https://oauth2.googleapis.com/token"
     },
-    "clientId": "__ANTIGRAVITY_OAUTH_CLIENT_ID_FROM_ENV__",
-    "clientSecret": "__ANTIGRAVITY_OAUTH_CLIENT_SECRET_FROM_ENV__",
     "tokenUrl": "https://oauth2.googleapis.com/token"
   },
   "assemblyai": {
@@ -122,7 +120,6 @@
       "orgUrl": "https://api.anthropic.com/v1/organizations/{org_id}/usage",
       "settingsUrl": "https://api.anthropic.com/v1/settings"
     },
-    "clientId": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
     "tokenUrl": "https://api.anthropic.com/v1/oauth/token"
   },
   "cline": {
@@ -202,7 +199,6 @@
       "resetCreditsUrl": "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits",
       "resetCreditsConsumeUrl": "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume"
     },
-    "clientId": "app_EMoamEEZ73f0CkXaXp7hrann",
     "tokenUrl": "https://auth.openai.com/oauth/token"
   },
   "cohere": {
@@ -286,15 +282,11 @@
       "quotaUrl": "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
       "loadCodeAssistUrl": "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
     },
-    "clientId": "__GOOGLE_OAUTH_CLIENT_ID_FROM_ENV__",
-    "clientSecret": "__GOOGLE_OAUTH_CLIENT_SECRET_FROM_ENV__",
     "tokenUrl": "https://oauth2.googleapis.com/token"
   },
   "gemini": {
     "baseUrl": "https://generativelanguage.googleapis.com/v1beta/models",
     "format": "gemini",
-    "clientId": "__GOOGLE_OAUTH_CLIENT_ID_FROM_ENV__",
-    "clientSecret": "__GOOGLE_OAUTH_CLIENT_SECRET_FROM_ENV__",
     "auth": {
       "apiKey": {
         "header": "x-goog-api-key",
@@ -332,7 +324,6 @@
       "url": "https://api.github.com/copilot_internal/user"
     },
     "format": "openai",
-    "clientId": "Iv1.b507a08c87ecfe98",
     "tokenUrl": "https://github.com/login/oauth/access_token"
   },
   "gitlab": {
@@ -427,7 +418,6 @@
         "delayMs": 1500
       }
     },
-    "clientId": "b1a00492-073a-47ea-816f-4c329264a828",
     "tokenUrl": "https://auth.x.ai/oauth2/token"
   },
   "grok-web": {
@@ -452,8 +442,6 @@
       "User-Agent": "iFlow-Cli"
     },
     "format": "openai",
-    "clientId": "10009311001",
-    "clientSecret": "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW",
     "tokenUrl": "https://iflow.cn/oauth/token"
   },
   "kilocode": {
@@ -489,7 +477,6 @@
       "Anthropic-Version": "2023-06-01",
       "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
     },
-    "clientId": "17e5f671-d194-4dfb-9706-5516cb48c098",
     "tokenUrl": "https://auth.kimi.com/api/oauth/token",
     "refreshUrl": "https://auth.kimi.com/api/oauth/token",
     "auth": {
@@ -828,7 +815,6 @@
     "baseUrl": "https://api.x.ai/v1/chat/completions",
     "validateUrl": "https://api.x.ai/v1/models",
     "responsesUrl": "https://api.x.ai/v1/responses",
-    "clientId": "b1a00492-073a-47ea-816f-4c329264a828",
     "tokenUrl": "https://auth.x.ai/oauth2/token",
     "refreshUrl": "https://auth.x.ai/oauth2/token",
     "format": "openai"

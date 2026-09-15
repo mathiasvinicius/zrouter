@@ -1,5 +1,61 @@
+# ─────────────────────────────────────────────────────────────
+# Segredos — NUNCA versionar
+# ─────────────────────────────────────────────────────────────
 .env
-data/
-app/.next/
-app/node_modules/
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+jwt-secret*
+*.credentials
+.netrc
+.git-credentials
 
+# ─────────────────────────────────────────────────────────────
+# Estado local / dados de runtime
+# ─────────────────────────────────────────────────────────────
+data/
+app/data/
+app/tmp/
+tmp/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.db
+
+# ─────────────────────────────────────────────────────────────
+# Build / dependências
+# ─────────────────────────────────────────────────────────────
+app/node_modules/
+app/.next/
+app/.next-cli-build/
+app/out/
+app/coverage/
+node_modules/
+.next/
+
+# ─────────────────────────────────────────────────────────────
+# Logs e artefatos locais
+# ─────────────────────────────────────────────────────────────
+*.log
+logs/
+docs/*.log
+*-entrega*.log
+.dev-server.log
+.dev-server-err.log
+debug.log
+.repo/
+.script/
+.codegraph/
+.PR/
+.kiro/
+
+# ─────────────────────────────────────────────────────────────
+# Sistema
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~

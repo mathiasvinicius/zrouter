@@ -82,14 +82,18 @@ export const ANTIGRAVITY_IDE_VERSION = "2.11.0";
 export const ANTIGRAVITY_IDE_BASE_URL = "https://daily-cloudcode-pa.googleapis.com";
 export const ANTIGRAVITY_IDE_USER_AGENT = `antigravity/ide/${ANTIGRAVITY_IDE_VERSION} darwin/arm64`;
 
-// Antigravity OAuth client credentials (public CLI client — duplicated in usage.js + src/lib/oauth)
+// OAuth client credentials are NOT stored in the repository.
+// Provide them via environment (see .env.example) — the Google CLI clients are
+// public, but shipping client secrets in git trips secret scanners and leaks
+// credentials into forks. Set:
+//   ANTIGRAVITY_OAUTH_CLIENT_ID / ANTIGRAVITY_OAUTH_CLIENT_SECRET
+//   GOOGLE_OAUTH_CLIENT_ID       / GOOGLE_OAUTH_CLIENT_SECRET
 export const ANTIGRAVITY_OAUTH_CLIENT = {
-  clientId: "__ANTIGRAVITY_OAUTH_CLIENT_ID_FROM_ENV__",
-  clientSecret: "__ANTIGRAVITY_OAUTH_CLIENT_SECRET_FROM_ENV__"
+  clientId: process.env.ANTIGRAVITY_OAUTH_CLIENT_ID || "",
+  clientSecret: process.env.ANTIGRAVITY_OAUTH_CLIENT_SECRET || ""
 };
 
-// Gemini (Google) OAuth client credentials (public CLI client — shared by gemini, gemini-cli, src/lib/oauth)
 export const GOOGLE_OAUTH_CLIENT = {
-  clientId: "__GOOGLE_OAUTH_CLIENT_ID_FROM_ENV__",
-  clientSecret: "__GOOGLE_OAUTH_CLIENT_SECRET_FROM_ENV__"
+  clientId: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
+  clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || ""
 };
