@@ -25,9 +25,6 @@ const nextConfig = {
     root: tracingRoot
   },
   outputFileTracingRoot: tracingRoot,
-  outputFileTracingExcludes: {
-    "*": ["./gitbook/**/*"]
-  },
   images: {
     unoptimized: true
   },
@@ -53,9 +50,17 @@ const nextConfig = {
     config.watchOptions = {
       ...config.watchOptions,
       aggregateTimeout: 300,
-      ignored: /[\\/](node_modules|\.git|logs|\.next|\.next-cli-build|gitbook|cli|open-sse\.old|tests|docs)[\\/]/,
+      ignored: /[\\/](node_modules|\.git|logs|\.next|\.next-cli-build|cli|open-sse\.old|tests|docs)[\\/]/,
     };
     return config;
+  },
+  async redirects() {
+    return [
+      // Compatibility: skills were served as /skills/9router*/SKILL.md before the
+      // rebrand, and links to them may already be shared. 308 keeps the exact path.
+      { source: "/skills/9router/:path*", destination: "/skills/zrouter/:path*", permanent: true },
+      { source: "/skills/9router-:skill/:path*", destination: "/skills/zrouter-:skill/:path*", permanent: true },
+    ];
   },
   async rewrites() {
     return [

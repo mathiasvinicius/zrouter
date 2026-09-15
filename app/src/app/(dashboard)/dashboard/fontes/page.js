@@ -1,7 +1,7 @@
 "use client";
 
 // Fontes — knowledge-source status page (Notion / Open Notebook / Neo4j).
-// Card pattern follows OmniRoute health/free-tiers on 9Router components.
+// Card pattern follows OmniRoute health/free-tiers on ZRouter components.
 
 import { useEffect, useState } from "react";
 import { Card, Button, Badge } from "@/shared/components";

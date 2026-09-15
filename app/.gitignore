@@ -89,7 +89,13 @@ graphify-out/*
 
 # Kiro local workspace state
 .kiro/
+
+# Local scratch checkouts named `9router-*` (vendored forks, refs) — but NOT the
+# product's own skills: `skills/` ships in the repo (Dockerfile copies it to
+# public/skills), so the nine `zrouter-*` skill dirs must stay versioned.
 9router-*
+!skills/
+!skills/**
 
 # Local sensitive / temp files
 .engine-token.txt

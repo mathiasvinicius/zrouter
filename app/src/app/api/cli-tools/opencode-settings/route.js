@@ -87,7 +87,7 @@ export async function GET() {
   }
 }
 
-// POST - Apply 9Router as openai-compatible provider (multi-model support)
+// POST - Apply ZRouter as openai-compatible provider (multi-model support)
 export async function POST(request) {
   try {
     const { baseUrl, apiKey, model, models, activeModel, subagentModel } = await request.json();
@@ -118,7 +118,7 @@ export async function POST(request) {
     // Ensure provider object
     if (!config.provider) config.provider = {};
 
-    // Preserve any existing 9router provider entry and its models
+    // Preserve any existing zrouter provider entry and its models
     const existingProvider = config.provider["9router"] || { npm: "@ai-sdk/openai-compatible", options: {}, models: {} };
 
     // Merge options (overwrite baseURL/apiKey)
@@ -208,7 +208,7 @@ export async function PATCH(request) {
   }
 }
 
-// DELETE - Remove 9Router provider or specific models from config
+// DELETE - Remove ZRouter provider or specific models from config
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -240,7 +240,7 @@ export async function DELETE(request) {
         config.model = `9router/${remainingModels[0]}`;
       }
     } else {
-      // No specific model - remove entire 9router provider
+      // No specific model - remove entire zrouter provider
       if (config.provider) delete config.provider["9router"];
       if (config.model?.startsWith("9router/")) delete config.model;
     }
@@ -256,7 +256,7 @@ export async function DELETE(request) {
 
     return NextResponse.json({
       success: true,
-      message: modelToRemove ? `Model "${modelToRemove}" removed` : "9Router settings removed from OpenCode",
+      message: modelToRemove ? `Model "${modelToRemove}" removed` : "ZRouter settings removed from OpenCode",
     });
   } catch (error) {
     console.log("Error resetting opencode settings:", error);

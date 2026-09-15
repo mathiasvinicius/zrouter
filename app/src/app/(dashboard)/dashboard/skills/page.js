@@ -77,10 +77,12 @@ export default function SkillsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Card padding="md">
-        <div className="text-xs text-text-muted mb-2">Paste this to your AI:</div>
-        <div className="px-3 py-2 rounded bg-surface-2 font-mono text-[12px] text-text-main">
-          Read this skill and use it: {getSkillRawUrl("9router", origin)}
-        </div>
+        <h1 className="text-sm font-semibold text-text-main">Skills do ZRouter</h1>
+        <p className="text-xs text-text-muted mt-1">
+          Nada precisa ser colado: o gateway já injeta o índice de capacidades em toda
+          requisição autenticada no bloco <code className="font-mono">ZROUTER_CAPABILITIES</code>.
+          As skills abaixo são referência — leia a da capacidade necessária.
+        </p>
       </Card>
 
       <div className="space-y-2">
@@ -94,11 +96,11 @@ export default function SkillsPage() {
           <div>
             <h2 className="text-sm font-semibold text-text-main">Skills desta instalação</h2>
             <p className="text-xs text-text-muted mt-0.5">
-              Os links acima são servidos pelo 9Router atual e acompanham suas customizações.
+              Os links acima são servidos por este ZRouter e acompanham suas customizações.
             </p>
           </div>
           <a
-            href={getSkillRawUrl("9router", origin)}
+            href={getSkillRawUrl("zrouter", origin)}
             target="_blank"
             rel="noreferrer"
             className="text-sm text-primary hover:underline inline-flex items-center gap-1"

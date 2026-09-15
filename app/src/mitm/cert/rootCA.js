@@ -54,7 +54,7 @@ function generateRootCA() {
 
   const attrs = [
     { name: "commonName", value: "9Router MITM Root CA" },
-    { name: "organizationName", value: "9Router" },
+    { name: "organizationName", value: "ZRouter" },
     { name: "countryName", value: "US" }
   ];
 

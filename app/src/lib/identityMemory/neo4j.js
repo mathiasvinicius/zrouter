@@ -113,7 +113,7 @@ function termsForQuery(query) {
 
 function sanitizeMemoryText(value) {
   return String(value || "")
-    .replace(/<!--\s*9ROUTER_[\s\S]*?-->/gi, "[marcador removido]")
+    .replace(/<!--\s*ZROUTER_[\s\S]*?-->/gi, "[marcador removido]")
     .slice(0, 1200)
     .trim();
 }
@@ -308,7 +308,7 @@ export async function retainForProfile(profile, body, documentId) {
           CASE WHEN tag IN acc THEN acc ELSE acc + tag END)
       RETURN m.id, m.bank, m.entities_status`, {
       id, bank, text: content, factType: "observation", now,
-      context: `9Router conversation for ${profile.name || profile.id}`,
+      context: `ZRouter conversation for ${profile.name || profile.id}`,
       tags: [`api-key:${profile.id}`], documentId: stableDocumentId,
     })], 5000);
     const returnedBank = rows(results[0])[0]?.[1];

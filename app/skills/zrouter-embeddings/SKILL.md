@@ -1,0 +1,69 @@
+---
+name: zrouter-embeddings
+description: Use para gerar embeddings de aplicação pelo endpoint /v1/embeddings do ZRouter, após descobrir um modelo disponível. Não é o mecanismo de memória Neo4j das identidades.
+---
+
+# ZRouter — Embeddings
+
+Leia a [skill de entrada](../zrouter/SKILL.md) para endereço e autenticação. Esta capacidade é separada da [memória de identidade](../zrouter-memory/SKILL.md).
+
+## Discover
+
+```bash
+curl $ZROUTER_URL/v1/models/embedding | jq '.data[].id'
+# Per-model dimensions
+curl "$ZROUTER_URL/v1/models/info?id=openai/text-embedding-3-small"
+```
+
+## Endpoint
+
+`POST $ZROUTER_URL/v1/embeddings`
+
+| Field | Required | Notes |
+|---|---|---|
+| `model` | yes | from `/v1/models/embedding` |
+| `input` | yes | string OR array of strings |
+| `encoding_format` | no | `float` (default) / `base64` |
+| `dimensions` | no | OpenAI v3 only |
+
+## Examples
+
+```bash
+curl -X POST $ZROUTER_URL/v1/embeddings \
+  -H "Authorization: Bearer $ZROUTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"openai/text-embedding-3-small","input":["hello","world"]}'
+```
+
+JS:
+
+```js
+const r = await fetch(`${process.env.ZROUTER_URL}/v1/embeddings`, {
+  method: "POST",
+  headers: { "Authorization": `Bearer ${process.env.ZROUTER_KEY}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ model: "gemini/text-embedding-004", input: "RAG chunk text" }),
+});
+const { data } = await r.json();
+console.log(data[0].embedding.length);  // dimension
+```
+
+## Response shape
+
+```json
+{ "object": "list", "model": "openai/text-embedding-3-small",
+  "data": [
+    { "object": "embedding", "index": 0, "embedding": [0.0123, -0.045, ...] },
+    { "object": "embedding", "index": 1, "embedding": [...] }
+  ],
+  "usage": { "prompt_tokens": 5, "total_tokens": 5 } }
+```
+
+## Provider quirks
+
+| Provider | Notes |
+|---|---|
+| `openai`, `openrouter`, `mistral`, `voyage-ai`, `fireworks`, `together`, `nebius`, `github`, `nvidia`, `jina-ai` | Native OpenAI shape — `dimensions` works only on OpenAI v3 (`text-embedding-3-*`) |
+| `gemini`, `google_ai_studio` | Server auto-converts to `embedContent`/`batchEmbedContents` — send OpenAI shape |
+| `openai-compatible-*`, `custom-embedding-*` | Custom `baseUrl` from credentials |
+
+Batch (`input` as array) is faster; some providers cap batch size.

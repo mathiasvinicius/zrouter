@@ -26,6 +26,8 @@ export function buildClineHeaders(token, extraHeaders = {}) {
   const headers = {
     "HTTP-Referer": "https://cline.bot",
     "X-Title": "Cline",
+    // Wire fingerprint Cline's API expects; keep the upstream value (Category B), even
+    // though the visible product is ZRouter — a changed client id can trip their WAF.
     "User-Agent": `9Router/${APP_VERSION}`,
     "X-PLATFORM": process.platform || "unknown",
     "X-PLATFORM-VERSION": process.version || "unknown",

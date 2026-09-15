@@ -31,11 +31,11 @@ const EXCLUDE = [
 // Marcadores cuja presença prova que um custom sobreviveu a um merge (portão 3).
 // Cada entrada aponta o arquivo que DE FATO contém o texto (verificado no código).
 const MARKERS = [
-  { file: "app/open-sse/rtk/identity.js", must: ["9ROUTER_SOURCES", "SOURCES_MARKER"] },
+  { file: "app/open-sse/rtk/identity.js", must: ["ZROUTER_SOURCES", "SOURCES_MARKER"] },
   { file: "app/src/lib/identityMemory/neo4j.js", must: ["MERGE (b:Bank", "ON CREATE"] },
   { file: "app/open-sse/sources/index.js", must: ["searchSources", "SourcePermissionError"] },
   { file: "app/src/lib/sources/context.js", must: ["recallSourcesForKey", "capabilitiesBlockForKey"] },
-  { file: "app/src/shared/constants/capabilities.js", must: ["9ROUTER_CAPABILITIES", "MAX_CAPABILITIES_CHARS"] },
+  { file: "app/src/shared/constants/capabilities.js", must: ["ZROUTER_CAPABILITIES", "MAX_CAPABILITIES_CHARS"] },
   { file: "docker-compose.yml", must: ["profiles:", "bundled"] },
 ];
 

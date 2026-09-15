@@ -1,27 +1,27 @@
 # Skills do ZRouter
 
-Estas instruções são servidas pelo próprio 9Router em `/skills/`. Use a origem
+Estas instruções são servidas pelo próprio ZRouter em `/skills/`. Use a origem
 do seu servidor (local ou Tailscale), não os arquivos da versão pública antiga.
-Comece pela [skill de entrada](9router/SKILL.md), que explica autenticação,
+Comece pela [skill de entrada](zrouter/SKILL.md), que explica autenticação,
 descoberta de modelos e seleção da combinação vinculada à chave.
 
 | Capacidade | Instruções |
 |---|---|
-| Chat e código | [9router-chat](9router-chat/SKILL.md) |
-| Identidade e memória Neo4j | [9router-memory](9router-memory/SKILL.md) |
-| Imagens | [9router-image](9router-image/SKILL.md) |
-| Vídeo | [9router-video](9router-video/SKILL.md) |
-| Síntese de voz | [9router-tts](9router-tts/SKILL.md) |
-| Transcrição | [9router-stt](9router-stt/SKILL.md) |
-| Embeddings | [9router-embeddings](9router-embeddings/SKILL.md) |
-| Busca web | [9router-web-search](9router-web-search/SKILL.md) |
-| Leitura de URL | [9router-web-fetch](9router-web-fetch/SKILL.md) |
+| Chat e código | [zrouter-chat](zrouter-chat/SKILL.md) |
+| Identidade e memória Neo4j | [zrouter-memory](zrouter-memory/SKILL.md) |
+| Imagens | [zrouter-image](zrouter-image/SKILL.md) |
+| Vídeo | [zrouter-video](zrouter-video/SKILL.md) |
+| Síntese de voz | [zrouter-tts](zrouter-tts/SKILL.md) |
+| Transcrição | [zrouter-stt](zrouter-stt/SKILL.md) |
+| Embeddings | [zrouter-embeddings](zrouter-embeddings/SKILL.md) |
+| Busca web | [zrouter-web-search](zrouter-web-search/SKILL.md) |
+| Leitura de URL | [zrouter-web-fetch](zrouter-web-fetch/SKILL.md) |
 
 Exemplo para um cliente que consegue ler URLs: `Leia
-http://<seu-servidor>:20128/skills/9router/SKILL.md e siga apenas as
+http://<seu-servidor>:<porta>/skills/zrouter/SKILL.md e siga apenas as
 capacidades realmente disponíveis à sua chave.` Não inclua a API key na URL.
 
-Para chamadas de API, configure `NINEROUTER_URL` com a mesma origem e
-`NINEROUTER_KEY` com a chave de usuário apropriada. A memória automática
-do 9Router é isolada pelo `bank` da chave no Neo4j; a skill de memória
+Para chamadas de API, configure `ZROUTER_URL` com a mesma origem e
+`ZROUTER_KEY` com a chave de usuário apropriada. A memória automática
+do ZRouter é isolada pelo `bank` da chave no Neo4j; a skill de memória
 explica quando há, ou não, uma ferramenta de busca adicional no cliente.

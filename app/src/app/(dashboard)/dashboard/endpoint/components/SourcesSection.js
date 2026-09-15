@@ -2,7 +2,7 @@
 
 // "Fontes de Conhecimento" section for the API-key create/edit modals.
 // Visual pattern follows the OmniRoute api-manager/tokens modals (dark card rows,
-// toggle chips, inline scope lists with +/× buttons) on 9Router components.
+// toggle chips, inline scope lists with +/× buttons) on ZRouter components.
 
 import PropTypes from "prop-types";
 import { useState } from "react";

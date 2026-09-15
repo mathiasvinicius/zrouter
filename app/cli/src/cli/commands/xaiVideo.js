@@ -1,6 +1,6 @@
 /**
  * `9router xai video` — generate a Grok Imagine video through the local
- * 9router gateway and save the result as an MP4 file.
+ * zrouter gateway and save the result as an MP4 file.
  *
  * Flow: POST /v1/videos/generations → poll GET /v1/videos/{request_id}
  * until done/failed/timeout → download video.url → atomic rename.
@@ -25,7 +25,7 @@ const FAILED_STATUSES = new Set(["failed", "error", "expired", "cancelled"]);
 const HELP = `
 Usage: 9router xai video --prompt "..." [options]
 
-Generate a Grok Imagine video via your local 9router gateway
+Generate a Grok Imagine video via your local ZRouter gateway
 (requires a connected xAI account — Grok Build OAuth or API key).
 
 Options:

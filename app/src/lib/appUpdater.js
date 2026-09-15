@@ -49,7 +49,7 @@ function collectAppPids() {
       const lines = output.split("\n").slice(1).filter(l => l.trim());
       lines.forEach(line => {
         const lower = line.toLowerCase();
-        // Match anything running from 9router install dir or wrapper cli.js
+        // Match anything running from zrouter install dir or wrapper cli.js
         const isAppProcess = lower.includes("9router") ||
           lower.includes("next-server") ||
           lower.includes("\\bin\\app\\") ||
@@ -156,10 +156,10 @@ export async function killAppProcesses() {
   }
 }
 
-// Resolve npx/9router binary to relaunch after update (cross-platform)
+// Resolve npx/zrouter binary to relaunch after update (cross-platform)
 function resolveRelaunchCommand() {
   const isWin = process.platform === "win32";
-  // Prefer `npx 9router` — works regardless of global bin path changes after npm i -g
+  // Prefer `npx zrouter` — works regardless of global bin path changes after npm i -g
   const npx = isWin ? "npx.cmd" : "npx";
   return { cmd: npx, args: [UPDATER_CONFIG.npmPackageName] };
 }

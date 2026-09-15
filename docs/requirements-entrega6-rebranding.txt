@@ -1,0 +1,265 @@
+# REQUIREMENTS — Entrega 6: rebranding completo para ZRouter
+
+**Repo:** `/opt/containers/zrouter` (raiz), código em `./app`
+**Ambiente dev:** 20129. **PRODUÇÃO 20128 e Neo4j de produção — NÃO TOCAR.**
+
+---
+
+## OBJETIVO
+
+O dono determinou: **onde existir "9Router", atualizar para "ZRouter"**. O fork é uma
+distribuição independente; quem instala deve ver ZRouter, não a marca do upstream.
+
+O inventário medido na árvore:
+
+| Padrão | Ocorrências | Arquivos |
+|---|---|---|
+| `9Router` (marca) | 2.192 | 253 |
+| `9router` (slug/env/path) | 2.327 | 312 |
+| `9ROUTER` (constantes) | 67 | 13 |
+| `NINEROUTER` (docs) | 23 | 11 |
+
+**Nem tudo pode mudar.** Este contrato separa o que rebranda do que é protocolo/compatibilidade.
+Siga as categorias — não faça substituição cega.
+
+---
+
+## CATEGORIA A — REBRANDAR (visível, decidido)
+
+### A1. Arquivos de skill (o caso mais importante)
+`app/skills/**/SKILL.md` — todos os 10. Hoje dizem 9Router. Corrigir:
+- `9Router` → `ZRouter` no texto
+- **A porta 20128 está CORRETA — não altere.** Decisão do dono: 20128 é a porta-alvo do
+  ZRouter; quando ele estiver funcional, ele **substitui** o 9Router atual nessa mesma porta.
+  Portanto as skills apontando para `127.0.0.1:20128` já descrevem o estado final desejado.
+  Mantenha o endereço como está (a lógica de "o endereço-base é a origem da URL desta skill"
+  continua válida para acesso remoto).
+- O que muda é só a **marca** (ZRouter), não o endereço.
+
+> Contexto para o rebranding: o ZRouter é o sucessor do 9Router nesta instalação. O texto das
+> skills deve fazer sentido tanto no dev (20129) quanto depois do cutover (20128) — por isso a
+> regra "o endereço-base é a origem desta URL" é mais importante que o exemplo hardcoded.
+> Não invente menção a 20129 nas skills.
+
+### A2. `app/skills/` NÃO está versionado — CORRIGIR PRIMEIRO
+`app/.gitignore:92` tem a regra `9router-*`, que ignora **as 9 skills filhas**. Verificado:
+apenas `app/skills/9router/SKILL.md` e `app/skills/README.md` estão rastreados.
+
+Ou seja: quem clona o repo **não recebe as skills**. Corrija a regra do `.gitignore` para que
+as skills sejam versionadas (o diretório é conteúdo do produto, não artefato local). Confirme
+com `git check-ignore -v app/skills/9router-chat/SKILL.md` que passou a ser rastreado.
+
+⚠️ Cuidado: a regra `9router-*` pode existir para outro fim. Verifique o que ela ignorava
+além de `app/skills/` antes de remover — se ignorava artefatos legítimos, restrinja a regra
+em vez de apagá-la (ex.: mantenha para a raiz, libere para `app/skills/`).
+
+### A3. Renomear os IDs de skill e o diretório
+- Diretório: `app/skills/9router*/` → `app/skills/zrouter*/`
+- IDs em `app/src/shared/constants/skills.js`: `9router` → `zrouter`, `9router-chat` →
+  `zrouter-chat`, etc.
+- `getSkillRawUrl()` gera `${origin}/skills/${id}/SKILL.md` — com os ids novos, a URL passa a
+  ser `/skills/zrouter/SKILL.md`. **Mantenha compatibilidade:** o dashboard antigo e links já
+  compartilhados apontam para `/skills/9router/...`. Se for barato, deixe um redirect; se não,
+  documente a mudança no README. Decida e **explique a escolha no commit**.
+- O `Dockerfile` copia `skills/` para `public/skills` — o caminho continua o mesmo, só o nome
+  do diretório interno muda.
+
+### A4. Marca visível na aplicação
+- `app/src/shared/constants/skills.js`: nomes e descrições ("9Router (Entry)" → "ZRouter (Entry)")
+- `app/src/app/(dashboard)/dashboard/skills/page.js`: **remover o bloco "Paste this to your AI"**
+  — o dono não quer que ninguém precise colar nada. No lugar, explicar que o gateway já injeta
+  o índice de capacidades em toda requisição (bloco `ZROUTER_CAPABILITIES`, ver A5) e que as
+  skills servem como referência, não como passo de instalação.
+- `app/package.json`: `"name": "9router-app"` → `"name": "zrouter-app"` (confirme que nada
+  importa esse nome — verificado: só `package-lock.json` o repete)
+- `app/docker-compose.yml` (o do `app/`, distinto do da raiz): service `9router` e imagem
+  `decolua/9router:latest` — este arquivo parece ser o compose **do upstream**, não o nosso.
+  Se for código nosso, rebrandar; se for artefato do upstream que não usamos, **remover** o
+  arquivo em vez de rebrandar (menos conflito no update). Decida e explique.
+- `app/docker-compose.staging.yml`: caminho `9ROUTER` de produção → rebrandar (é nosso)
+
+### A5. Constantes de protocolo — DECISÃO EXPLÍCITA (leia antes)
+Os marcadores `ZROUTER_SOURCES`, `ZROUTER_CAPABILITIES`, `9ROUTER_SOUL`, `9ROUTER_MEMORY`,
+`9ROUTER_MENTAL_MODEL`, `9ROUTER_GLOBAL`, `9ROUTER_IDENTITY` são **injetados no prompt** a cada
+requisição. São nossos (não existem no upstream).
+
+**Renomeie para `ZROUTER_*`** — são protocolo interno nosso, não há cliente externo que
+dependa do nome, e a marca deve ser consistente. Ao fazer:
+- `app/open-sse/rtk/identity.js` (MARKER, SOURCES_MARKER, os `parts.push` de cada bloco)
+- `app/src/shared/constants/capabilities.js` (CAPABILITIES_MARKER)
+- Atualize **os testes** que asseguram esses literais: `sources-injection.test.js`,
+  `capabilities-block.test.js` (verificado: 12 asserções dependem das strings exatas)
+- Atualize o `globalInstructions` no SQLite do ZRouter (backup antes!) que documenta os blocos
+- Regra de ouro: a string emitida e a string verificada nos testes **mudam juntas**. O bloco
+  continua idempotente (`injectIdentity` não duplica).
+
+### A6. Documentação própria
+- `app/README.md`, `app/DOCKER.md`, `app/IDENTITY_MEMORY.md`, `app/CLAUDE.md`,
+  `docs/UPDATE-PIPELINE.md`, `docs/CUSTOMS.md` (regenere depois), `app/.env.example`
+- `app/README.zh-CN.md` — versão chinesa do README do upstream; rebrandar ou remover (decida;
+  remover reduz conflito de update, mas perde conteúdo)
+- `app/start.sh`, `app/CHANGELOG.md`
+
+### A7. `NINEROUTER_*` nos docs de skill
+`NINEROUTER_URL` → `ZROUTER_URL` etc. nos SKILL.md (11 arquivos).
+
+---
+
+## CATEGORIA B — MANTER (compatibilidade — NÃO mude)
+
+Estes são **contratos com o ambiente do usuário**. Renomear quebraria instalações existentes:
+
+| Item | Onde | Por quê manter |
+|---|---|---|
+| `model_provider = "9router"`, `[model_providers.9router]` | `cli-tools/codex-settings/route.js` | É a chave gravada no `~/.codex/config.toml` do usuário. Renomear exigiria reconfigurar o Codex dele. |
+| `providers["9router"]` | `cli-tools/jcode-settings`, `openclaw-settings` | idem, config persistida no PC |
+| `JCODE_9ROUTER_API_KEY` | idem | nome de variável de ambiente já exportada |
+| `sk_9router` | placeholders nos CLI tools | valor default exibido em config; cosmético mas referenciado em docs do usuário |
+
+**Alternativa se quiser unificar:** aceitar AMBOS ao LER (compat) e emitir o novo ao ESCREVER.
+Se implementar isso, documente no commit. Se não, deixe como está e **liste na ressalva final** —
+o dono merece saber o que ficou de fora e por quê.
+
+---
+
+## CATEGORIA C — FORA DE ESCOPO (não rebrandar)
+
+- `app/gitbook/**` — **1.853 ocorrências**: documentação traduzida do upstream. Rebrandar geraria
+  conflito gigante em cada update (é justamente o que a `docs/UPDATE-PIPELINE.md` quer evitar) e
+  não tem valor para o usuário final. **Remover do repositório** OU manter com um `NOTICE`
+  dizendo que é documentação do upstream 9Router sob MIT. Escolha o que reduzir conflito.
+- `app/CHANGELOG.md` (histórico do upstream): mantenha como está — é registro legítimo do
+  projeto de origem. Renomear mentiria sobre a história.
+- Linhas de atribuição nos créditos (`README.md` raiz, `docs/CUSTOMS.md`): o fork **deve**
+  citar 9Router e OmniRoute. Não remova as referências de crédito.
+- `app/tests/__baseline__/**` (fixtures do upstream): rebrandar quebraria a comparação.
+
+---
+
+## PARTE D — Preparação para o CUTOVER (20129 → 20128)
+
+**Decisão do dono:** quando o ZRouter estiver funcional, ele **substitui** o 9Router atual e
+passa a ocupar a **porta 20128**. Verificado que isso é favorável: o código já assume 20128 como
+default (o padrão do upstream), então o cutover é uma troca de container, não uma reescrita.
+
+### D1. Não quebre o dev agora
+- Mantenha o compose de **dev na 20129** (`PORT: "20129"`). O cutover é uma operação à parte,
+  feita pelo dono/EVE com o ZRouter já validado — **não antecipe**.
+- **NÃO** altere a porta do container em execução. **NÃO** pare o 9Router de produção.
+
+### D2. Deixe o cutover documentado e mecanizável
+Crie `docs/CUTOVER-20128.md` descrevendo o procedimento exato, para que ele seja executado sem
+improviso quando o dono aprovar:
+
+1. **Pré-requisito:** ZRouter validado em 20129 (dashboard, fontes, memória, providers)
+2. **Backup:** SQLite do 9Router (`/opt/containers/9router/data/db/data.sqlite`) e o do ZRouter
+3. **Snapshot do que migra** — a decisão de dados é do dono, mas o documento deve listar:
+   - providers/connections, combos, API keys, settings (incl. `globalInstructions`)
+   - o que **não** migra automaticamente (nada de credencial em claro)
+4. **Sequência:** parar o 9Router → subir o ZRouter com `PORT=20128` → validar health/rotas →
+   rollback documentado (voltar o 9Router)
+5. **Verificação pós-cutover:** `/api/health`, `/v1/models`, dashboard, uma geração real
+6. **Rollback:** como reverter em <5 min
+
+⚠️ **Não execute o cutover.** Apenas documente. A execução exige aprovação explícita do dono,
+por ser uma parada de produção.
+
+### D3. As skills continuam corretas
+Os SKILL.md já apontam para `127.0.0.1:20128` — que é o endereço final. Não mude (ver A1).
+
+---
+
+## VERIFICAÇÃO OBRIGATÓRIA
+
+### V1. Contagem residual
+```bash
+cd /opt/containers/zrouter
+# esperado: só nos arquivos da Categoria B e C, e nos créditos
+grep -rIn '9Router\|9router' app/ --include='*.js' --include='*.md' --include='*.sh' \
+  --include='*.json' | grep -v node_modules | grep -v '.next' | grep -v gitbook | wc -l
+```
+Liste cada ocorrência restante com a justificativa (B ou C). **Nenhuma ocorrência da Categoria A
+pode sobrar.**
+
+### V2. Skills versionadas e acessíveis
+```bash
+git check-ignore -v app/skills/zrouter-chat/SKILL.md   # não pode ser ignorado
+git ls-files app/skills/ | wc -l                        # esperado: 10 skills + README
+```
+
+### V3. Blocos de protocolo funcionando com o nome novo
+Rode o teste real: injete um body e confirme que o marcador emitido é `ZROUTER_*`:
+```bash
+cd app/tests
+npx vitest run --config vitest.config.js \
+  unit/sources-injection.test.js unit/capabilities-block.test.js \
+  unit/sources-recall-timeout.test.js unit/neo4j-schema.test.js \
+  unit/ensure-bank-neo4j.test.js unit/memory-backend-migration.test.js
+```
+
+### V4. Suíte de regressão completa (as nossas)
+```bash
+cd app/tests
+export $(grep -E '^NEO4J_' /opt/containers/neo4j/.env | xargs)
+npx vitest run --config vitest.config.js unit/ 2>&1 | tail -5
+```
+Compare o conjunto de falhas com o HEAD — nenhuma falha **nova**.
+
+### V5. Build e a página de skills
+```bash
+cd app && npm run build     # RC=0
+```
+Confirme que `/dashboard/skills` (HTTP 200) não mostra mais o bloco "Paste this to your AI".
+Não rode `docker compose up -d` no projeto zrouter — só `config` se precisar.
+
+### V6. `globalInstructions`
+Backup antes: `data/db/data.sqlite.bak-entrega6-<timestamp>`. Confirme que o texto atualizado
+menciona `ZROUTER_*` e continua abaixo de ~2.500 chars.
+
+---
+
+## COMMIT
+
+Um commit único:
+```
+refactor(brand): ZRouter everywhere it matters — skills, protocol blocks, docs
+
+The fork ships as its own product, so every user-facing and protocol-level
+reference to the upstream brand becomes ZRouter.
+
+- rename the prompt-injection blocks 9ROUTER_* -> ZROUTER_* (ours, not upstream's)
+  and update the twelve test assertions that pin those literals
+- rename the skills directory and ids 9router-* -> zrouter-*, fixing app/.gitignore
+  which was silently excluding nine of the ten SKILL.md files from the repository
+- drop the "Paste this to your AI" block from /dashboard/skills: the gateway
+  already injects the capability index on every request, so nothing needs pasting
+- point the skill docs at the deployment's own origin instead of a hardcoded port
+- keep the CLI-tool provider key as "9router": it is written into the user's own
+  ~/.codex|~/.config files, and renaming it would force a reconfiguration
+- keep upstream attribution and CHANGELOG untouched; gitbook excluded from the
+  rebrand (<motivo>)
+```
+
+---
+
+## O QUE NÃO FAZER
+
+- **NÃO** trocar `9router` por `zrouter` com substituição cega — leia as categorias
+- **NÃO** renomear chaves de config de CLI tools que já vivem na máquina do usuário (Cat. B)
+- **NÃO** remover as linhas de crédito a 9Router/OmniRoute (o fork é MIT e deve creditar)
+- **NÃO** tocar em produção (20128, Neo4j de produção) nem rodar `compose up -d`
+- **NÃO** apagar volumes ou dados
+- **NÃO** quebrar teste para fazer o build passar
+- **NÃO** commitar `.env`, `docker-compose.override.yml`, `data/`, `*.log`
+- **NÃO** fazer push — EVE revisa e publica
+- **NÃO** mexer nos 6 imports mortos de `src/lib/oauth/services/*.js`
+
+## AO FINAL, IMPRIMA
+
+(a) arquivos alterados/renomeados/removidos, agrupados por categoria
+(b) output de V1 com a lista classificada (A/B/C) do que restou
+(c) output de V2 (skills versionadas)
+(d) saída dos testes e do build
+(e) decisões que exigiam julgamento (skills redirect, docker-compose do app/, gitbook, Cat. B) com a justificativa
+(f) hash do commit
+(g) o que NÃO conseguiu fazer

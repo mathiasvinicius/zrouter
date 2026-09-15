@@ -1,7 +1,7 @@
-const MARKER = "<!-- 9ROUTER_IDENTITY:v1 -->";
-const SOURCES_MARKER = "<!-- 9ROUTER_SOURCES";
+const MARKER = "<!-- ZROUTER_IDENTITY:v1 -->";
+const SOURCES_MARKER = "<!-- ZROUTER_SOURCES";
 const SEPARATOR = "\n\n";
-// Per-item excerpt cap, and the default/top for the whole 9ROUTER_SOURCES block.
+// Per-item excerpt cap, and the default/top for the whole ZROUTER_SOURCES block.
 const EXCERPT_MAX_CHARS = 400;
 const DEFAULT_SOURCES_MAX_CHARS = 4000;
 const MAX_SOURCES_MAX_CHARS = 20000;
@@ -59,18 +59,18 @@ function sourcesBlock(context) {
 export function promptFor(context) {
   const parts = [];
   if (context?.globalInstructions?.trim()) {
-    parts.push(`<!-- 9ROUTER_GLOBAL -->\nGlobal router instructions:\n${context.globalInstructions.trim()}`);
+    parts.push(`<!-- ZROUTER_GLOBAL -->\nGlobal router instructions:\n${context.globalInstructions.trim()}`);
   }
   if (context?.soul?.trim()) {
-    parts.push(`<!-- 9ROUTER_SOUL:${context.id || "default"} -->\nIdentity and permanent profile instructions:\n${context.soul.trim()}`);
+    parts.push(`<!-- ZROUTER_SOUL:${context.id || "default"} -->\nIdentity and permanent profile instructions:\n${context.soul.trim()}`);
   }
   if (context?.mentalModel?.trim()) {
-    parts.push(`<!-- 9ROUTER_MENTAL_MODEL:${context.mentalModelId || "default"} -->\nCurrent synthesized profile:\n${context.mentalModel.trim()}`);
+    parts.push(`<!-- ZROUTER_MENTAL_MODEL:${context.mentalModelId || "default"} -->\nCurrent synthesized profile:\n${context.mentalModel.trim()}`);
   }
   if (context?.bankId) {
     const memory = context?.memory?.trim()
       || "No relevant long-term memory was retrieved for the current query.";
-    parts.push(`<!-- 9ROUTER_MEMORY:${context.bankId} -->\nRouter-managed recall result for the current query:\n${memory}`);
+    parts.push(`<!-- ZROUTER_MEMORY:${context.bankId} -->\nRouter-managed recall result for the current query:\n${memory}`);
   }
   const sources = sourcesBlock(context);
   if (sources) parts.push(sources);

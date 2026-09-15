@@ -1,3 +1,10 @@
+# ZRouter CLI
+
+> Este é o pacote npm publicado como **`9router`** (nome/bin mantidos para não quebrar
+> instalações existentes). O produto é o **ZRouter**; veja o README da raiz do repositório.
+
+## Upstream README (referência)
+
 # 9Router - FREE AI Router & Token Saver
 
 **Never stop coding. Save 20-40% tokens with RTK + auto-fallback to FREE & cheap AI models.**

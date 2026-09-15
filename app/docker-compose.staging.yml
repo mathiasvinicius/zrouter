@@ -1,19 +1,19 @@
-name: 9router
+name: zrouter-staging
 
 services:
-  9router:
+  zrouter:
     build:
       context: .
       dockerfile: Dockerfile
-    image: 9router:custom
-    container_name: 9router
+    image: zrouter:custom
+    container_name: zrouter-staging
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /opt/containers/9ROUTER/data:/app/data
+      - /opt/containers/zrouter/data:/app/data
     environment:
       DATA_DIR: /app/data
-      PORT: "20128"
+      PORT: "20129"
       HOSTNAME: "0.0.0.0"
       NODE_ENV: production
       # Neo4j is the only identity-memory backend (Hindsight was removed).

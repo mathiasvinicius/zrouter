@@ -1,4 +1,4 @@
-// Capability index injected as 9ROUTER_CAPABILITIES.
+// Capability index injected as ZROUTER_CAPABILITIES.
 //
 // Derived from the skills registry (src/shared/constants/skills.js) plus the sources
 // the key actually has enabled — never a static skill list inside globalInstructions.
@@ -6,22 +6,22 @@
 
 import { SKILLS } from "@/shared/constants/skills.js";
 
-export const CAPABILITIES_MARKER = "<!-- 9ROUTER_CAPABILITIES:v1 -->";
+export const CAPABILITIES_MARKER = "<!-- ZROUTER_CAPABILITIES:v1 -->";
 export const MAX_CAPABILITIES_CHARS = 1200;
 
 // Capability labels whose lines are never dropped when the char budget is exceeded.
 const ALWAYS = ["chat", "models", "sources"];
-// Skill id → capability label; unlisted ids fall back to the id minus the 9router- prefix.
+// Skill id → capability label; unlisted ids fall back to the id minus the zrouter- prefix.
 const LABELS = {
-  "9router-chat": "chat",
-  "9router-image": "image",
-  "9router-video": "video",
-  "9router-tts": "tts",
-  "9router-stt": "stt",
-  "9router-embeddings": "embeddings",
-  "9router-web-search": "web-search",
-  "9router-web-fetch": "web-fetch",
-  "9router-memory": "memory",
+  "zrouter-chat": "chat",
+  "zrouter-image": "image",
+  "zrouter-video": "video",
+  "zrouter-tts": "tts",
+  "zrouter-stt": "stt",
+  "zrouter-embeddings": "embeddings",
+  "zrouter-web-search": "web-search",
+  "zrouter-web-fetch": "web-fetch",
+  "zrouter-memory": "memory",
 };
 // Human gloss for enabled origins; unknown origin → the id itself.
 const ORIGIN_LABELS = {
@@ -35,7 +35,7 @@ function capabilityLines(skills) {
   const lines = [];
   for (const skill of skills || []) {
     if (skill?.isEntry) continue;
-    const label = LABELS[skill?.id] || String(skill?.id || "").replace(/^9router-/, "");
+    const label = LABELS[skill?.id] || String(skill?.id || "").replace(/^zrouter-/, "");
     if (!label) continue;
     lines.push(skill.endpoint ? `- ${label}: POST ${skill.endpoint}` : `- ${label}`);
   }

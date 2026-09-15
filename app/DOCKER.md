@@ -1,6 +1,6 @@
 # Docker
 
-Run 9Router in a container. Published image: [`decolua/9router`](https://hub.docker.com/r/decolua/9router) — multi-platform `linux/amd64` + `linux/arm64`.
+Run ZRouter in a container (built from this repo; upstream published image: `decolua/9router`).
 
 ---
 
@@ -13,8 +13,8 @@ docker run -d \
   -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  --name 9router \
-  decolua/9router:latest
+  --name zrouter \
+  zrouter:latest
 ```
 
 App listens on port `20128`. Open: http://localhost:20128
@@ -22,10 +22,10 @@ App listens on port `20128`. Open: http://localhost:20128
 ## Manage container
 
 ```bash
-docker logs -f 9router        # view logs
-docker stop 9router           # stop
-docker start 9router          # start again
-docker rm -f 9router          # remove
+docker logs -f zrouter        # view logs
+docker stop zrouter           # stop
+docker start zrouter          # start again
+docker rm -f zrouter          # remove
 ```
 
 ## Data persistence
@@ -60,18 +60,18 @@ docker run -d \
   -e PORT=20128 \
   -e HOSTNAME=0.0.0.0 \
   -e DEBUG=true \
-  --name 9router \
-  decolua/9router:latest
+  --name zrouter \
+  zrouter:latest
 ```
 
 ## Optional Headroom sidecar
 
-The 9Router image does not bundle Python or Headroom. To use Headroom in Docker, run it as a separate service and point 9Router at that proxy:
+This image does not bundle Python or Headroom. To use Headroom in Docker, run it as a separate service and point ZRouter at that proxy:
 
 ```yaml
 services:
-  9router:
-    image: decolua/9router:latest
+  zrouter:
+    image: zrouter:latest
     ports:
       - "20128:20128"
     volumes:
@@ -95,8 +95,8 @@ If Headroom runs on the Docker host instead of as a sidecar, use `http://host.do
 ## Update to latest
 
 ```bash
-docker pull decolua/9router:latest
-docker rm -f 9router
+docker pull zrouter:latest
+docker rm -f zrouter
 # re-run the quick start command
 ```
 
@@ -107,19 +107,19 @@ docker rm -f 9router
 ## Build image locally (test)
 
 ```bash
-cd app && docker build -t 9router .
+cd app && docker build -t zrouter .
 
 docker run --rm -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  9router
+  zrouter
 ```
 
 ## Publish (automatic via CI)
 
 Push a git tag `v*` → GitHub Actions builds multi-platform (amd64+arm64) and pushes to:
-- `ghcr.io/decolua/9router:v{version}` + `:latest`
-- `decolua/9router:v{version}` + `:latest`
+- locally built: `zrouter:latest`
+- upstream (não usado por este fork): `ghcr.io/decolua/9router` · `decolua/9router`
 
 ```bash
 # Use scripts/release.js (recommended)

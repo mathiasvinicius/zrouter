@@ -33,9 +33,9 @@ describe("sources recall — timeout and fail-open", () => {
     const elapsed = Date.now() - started;
     expect(sources).toEqual([]);
     expect(elapsed).toBeLessThan(2000); // bounded by the configured timeout, not the backend
-    const prompt = promptFor({ id: KEY.id, bankId: "eve", sources, capabilities: "<!-- 9ROUTER_CAPABILITIES:v1 -->" });
-    expect(prompt).toContain("<!-- 9ROUTER_IDENTITY:v1 -->");
-    expect(prompt).not.toContain("9ROUTER_SOURCES");
+    const prompt = promptFor({ id: KEY.id, bankId: "eve", sources, capabilities: "<!-- ZROUTER_CAPABILITIES:v1 -->" });
+    expect(prompt).toContain("<!-- ZROUTER_IDENTITY:v1 -->");
+    expect(prompt).not.toContain("ZROUTER_SOURCES");
     expect(warnSpy.mock.calls.some(([line]) => String(line).includes("recall-timeout"))).toBe(true);
   });
 

@@ -17,9 +17,15 @@
   
   **Connect All AI Code Tools (Claude Code, Cursor, Antigravity, Copilot, Codex, Gemini, OpenCode, Cline, OpenClaw...) to 40+ AI Providers & 100+ Models.**
 
+> **Origem deste documento.** O corpo abaixo é a documentação herdada do upstream
+> **[9Router](https://github.com/decolua/9router)** (MIT) e é mantida como referência técnica
+> do núcleo do gateway — inclusive os comandos do pacote npm `9router`, que é o nome publicado
+> do launcher e **não** foi renomeado (renomear quebraria instalações existentes). O produto
+> distribuído aqui é o **ZRouter**: instalação e operação estão nas seções Quick Start e na
+> raiz do repositório (`../README.md`, `../docker-compose.yml`, porta **20129**).
 
 
-[🇧🇷 Português (Brasil)](./i18n/README.pt-BR.md) • [🇻🇳 Tiếng Việt](./i18n/README.vi.md) • [🇨🇳 中文](./i18n/README.zh-CN.md) • [🇯🇵 日本語](./i18n/README.ja-JP.md) • [🇷🇺 Русский](./i18n/README.ru.md) • [🇹🇭 ไทย](./i18n/README.th.md) • [🇮🇷 فارسی](./i18n/README.fa_IR.md) • [🇮🇩 Indonesia](./i18n/README.id-ID.md) • [🇪🇸 Español](./i18n/README.es.md) • [🇫🇷 Français](./i18n/README.fr.md)
+
 
 </div>
 
@@ -94,16 +100,17 @@ Result: Never stop coding, minimal cost + 20-40% token savings via RTK
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start (ZRouter)
 
 **1. Install globally:**
 
 ```bash
-npm install -g 9router
-9router
+git clone https://github.com/mathiasvinicius/zrouter.git
+cd zrouter
+cp .env.example .env      # edite as senhas
 ```
 
-🎉 Dashboard opens at `http://localhost:20128`
+🎉 Dashboard opens at `http://localhost:20129` (porta deste deploy; produção 9Router fica na 20128)
 
 **2. Connect a FREE provider (no signup needed):**
 
@@ -122,7 +129,7 @@ Claude Code/Codex/OpenClaw/Cursor/Cline Settings:
 
 **Alternative: run from source (this repository):**
 
-This repository package is private (`9router-app`), so source/Docker execution is the expected local development path.
+This repository package is private (`zrouter-app`), so source/Docker execution is the expected local development path.
 
 ```bash
 cp .env.example .env
