@@ -28,7 +28,7 @@ services:
       - ./.env
     environment:
       DATA_DIR: /app/data
-      PORT: "20129"
+      PORT: "20128"
       HOSTNAME: "0.0.0.0"
       NODE_ENV: production
       # Aponta para QUALQUER Neo4j — o bundled, um local ou um remoto
