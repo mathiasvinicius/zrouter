@@ -1,7 +1,7 @@
 # CUSTOMS — o que o ZRouter mudou em relação ao upstream
 
-> **Gerado automaticamente** por `scripts/update/audit-customs.mjs` em 2026-09-15 19:27:33.
-> Base: `zrouter-base-v0.5.75` (raiz do upstream 9Router) · comparada contra `app/` · HEAD `54e3a527`
+> **Gerado automaticamente** por `scripts/update/audit-customs.mjs` em 2026-09-15 20:01:09.
+> Base: `zrouter-base-v0.5.75` (raiz do upstream 9Router) · comparada contra `app/` · HEAD `e85c033e`
 >
 > **Não edite à mão.** Este documento é a memória do fork: a pipeline
 > (`docs/UPDATE-PIPELINE.md`) o consulta ao resolver conflitos de merge.
@@ -9,14 +9,14 @@
 
 ## Resumo
 
-- **Modificados** (existem no upstream): **78** — onde um merge disputa conteúdo
-- **Adicionados** (só nossos): 62
+- **Modificados** (existem no upstream): **79** — onde um merge disputa conteúdo
+- **Adicionados** (só nossos): 65
 - **Removidos** (no upstream, não em nós): 2
 
 O risco de um update mora nos **modificados**. Adicionados e removidos normalmente
 resolvem sozinhos.
 
-## Modificados (78) — pontos de acoplamento
+## Modificados (79) — pontos de acoplamento
 
 ### `src/lib` (11)
 
@@ -96,9 +96,14 @@ resolvem sozinhos.
 - `public/icons/icon-192.svg` — +9/-2
 - `public/icons/icon-512.svg` — +9/-2
 
+### `src` (2)
+
+- `src/dashboardGuard.js` — +1/-1
+- `src/instrumentation.js` — +6/-0
+
 ### `.env.example` (1)
 
-- `.env.example` — +53/-1
+- `.env.example` — +56/-1
 
 ### `.gitignore` (1)
 
@@ -188,10 +193,6 @@ resolvem sozinhos.
 
 - `src/app/manifest.js` — +2/-2
 
-### `src` (1)
-
-- `src/dashboardGuard.js` — +1/-1
-
 ### `src/sse` (1)
 
 - `src/sse/handlers/chat.js` — +67/-18
@@ -204,9 +205,9 @@ resolvem sozinhos.
 
 - `tests/__baseline__/providers-baseline.json` — +0/-15
 
-## Adicionados (62) — arquivos nossos
+## Adicionados (65) — arquivos nossos
 
-### `tests/unit` (20)
+### `tests/unit` (21)
 
 - `tests/unit/api-key-profile-options.test.js`
 - `tests/unit/capabilities-block.test.js`
@@ -217,6 +218,7 @@ resolvem sozinhos.
 - `tests/unit/model-auto-sync.test.js`
 - `tests/unit/model-caps-audio-filter.test.js`
 - `tests/unit/model-discover-endpoint.test.js`
+- `tests/unit/neo4j-schema.test.js`
 - `tests/unit/neo4j-trivial-memory.test.js`
 - `tests/unit/react-hook-imports.test.js`
 - `tests/unit/sources-contract.test.js`
@@ -229,7 +231,7 @@ resolvem sozinhos.
 - `tests/unit/xiaomi-mimo-oauth-proxy.test.js`
 - `tests/unit/xiaomi-mimo-oauth-session.test.js`
 
-### `src/lib` (13)
+### `src/lib` (14)
 
 - `src/lib/colorThemes.js`
 - `src/lib/db/migrations/002-api-key-sources.js`
@@ -240,13 +242,15 @@ resolvem sozinhos.
 - `src/lib/identityMemory/index.js`
 - `src/lib/identityMemory/neo4j.js`
 - `src/lib/identityMemory/profileConfig.js`
+- `src/lib/identityMemory/schema.js`
 - `src/lib/modelDiscovery.js`
 - `src/lib/modelSync.js`
 - `src/lib/oauth/providers/xiaomi-mimo.js`
 - `src/lib/sources/context.js`
 
-### `src/app/api` (6)
+### `src/app/api` (7)
 
+- `src/app/api/health/neo4j/route.js`
 - `src/app/api/keys/[id]/memories/route.js`
 - `src/app/api/oauth/xiaomi-mimo/api-key/route.js`
 - `src/app/api/oauth/xiaomi-mimo/auto-import/route.js`
