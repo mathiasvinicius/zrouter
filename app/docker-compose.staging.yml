@@ -16,4 +16,5 @@ services:
       PORT: "20128"
       HOSTNAME: "0.0.0.0"
       NODE_ENV: production
-      HINDSIGHT_API_URL: http://<host-remoto>:8888
+      # Neo4j is the only identity-memory backend (Hindsight was removed).
+      NEO4J_HTTP_URL: ${NEO4J_HTTP_URL:-http://127.0.0.1:7474}

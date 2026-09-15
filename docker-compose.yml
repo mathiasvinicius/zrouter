@@ -3,12 +3,16 @@ name: zrouter
 # ZRouter — Sovereign AI Gateway (ITMS Solutions)
 # Baseado em 9Router (MIT, github.com/decolua/9router) + OmniRoute (MIT)
 #
-# Start básico (só o gateway):
+# Start básico (só o gateway, apontando para o Neo4j que NEO4J_HTTP_URL definir):
+#   cp .env.example .env   (edite as senhas!)
 #   docker compose up -d
 #
-# Com fontes de conhecimento (Neo4j + Open Notebook):
-#   cp .env.example .env   (edite as senhas!)
-#   docker compose --profile extras up -d
+# Com as dependências embutidas (Neo4j + Open Notebook + SurrealDB) nesta máquina:
+#   docker compose --profile bundled up -d
+#
+# As dependências estão EMBUTIDAS mas NÃO obrigatórias: ficam atrás do profile
+# opt-in "bundled" e o depends_on usa required:false, então a ausência delas
+# nunca impede o gateway de subir (deploy remoto pode usar um Neo4j externo).
 
 services:
   # ── Core ──────────────────────────────────────────────────────
@@ -27,28 +31,31 @@ services:
       PORT: "20129"
       HOSTNAME: "0.0.0.0"
       NODE_ENV: production
-      # Fontes opcionais: preencha no .env e ative o profile "extras"
-      # (defaults assumem os containers abaixo na rede host)
+      # Aponta para QUALQUER Neo4j — local, bundled ou remoto (Tailscale/LAN).
+      # Em uma VPS: NEO4J_HTTP_URL=http://<host-remoto>:7474 (o zion-server)
       NEO4J_HTTP_URL: ${NEO4J_HTTP_URL:-http://127.0.0.1:7474}
       NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
       OPEN_NOTEBOOK_URL: ${OPEN_NOTEBOOK_URL:-http://127.0.0.1:5055}
     volumes:
       - ./data:/app/data
     depends_on:
       neo4j:
         condition: service_started
-        required: false
+        required: false        # ausente do projeto NÃO bloqueia o zrouter
       open-notebook:
         condition: service_started
         required: false
 
-  # ── Fontes de conhecimento (profile: extras) ──────────────────
+  # ── Dependências embutidas (profile opt-in: bundled) ──────────
   neo4j:
     image: neo4j:5.26-community
     container_name: zrouter-neo4j
-    profiles: ["extras"]
+    profiles: ["bundled"]
     restart: unless-stopped
     ports:
+      # Bind em loopback: para acesso remoto use a rede Tailscale.
       - "127.0.0.1:7474:7474"
       - "127.0.0.1:7687:7687"
     environment:
@@ -59,11 +66,17 @@ services:
     volumes:
       - ./data/neo4j:/data
       - ./data/neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   surrealdb:
     image: surrealdb/surrealdb:v2
     container_name: zrouter-surrealdb
-    profiles: ["extras"]
+    profiles: ["bundled"]
     restart: unless-stopped
     # Open Notebook usa rocksdb local; credenciais fortes via .env
     command: ["start", "--log", "info", "--user", "${SURREAL_USER:-open_notebook}", "--pass", "${SURREAL_PASSWORD:-change-me-surreal}", "rocksdb:/mydata/mydatabase.db"]
@@ -78,11 +91,11 @@ services:
   open-notebook:
     image: lfnovo/open_notebook:v1-latest
     container_name: zrouter-open-notebook
-    profiles: ["extras"]
+    profiles: ["bundled"]
     restart: unless-stopped
     ports:
-      - "5055:5055"
-      - "8502:8502"
+      - "127.0.0.1:5055:5055"
+      - "127.0.0.1:8502:8502"
     depends_on:
       - surrealdb
     environment:

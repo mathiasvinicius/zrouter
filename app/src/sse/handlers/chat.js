@@ -84,8 +84,8 @@ export async function handleChat(request, clientRawRequest = null) {
   let identityContext = null;
   let memoryProfile = null;
   if (profile.isService) {
-    // Internal services (for example Hindsight itself) are authenticated but must
-    // preserve their requested model and skip identity/memory to avoid recursion.
+    // Internal services are authenticated but must preserve their requested
+    // model and skip identity/memory to avoid a self-recursive recall loop.
     log.debug("AUTH", `Internal service key: ${profile.name || profile.id}`);
   } else {
     const combo = profile.comboId ? await getComboById(profile.comboId) : null;

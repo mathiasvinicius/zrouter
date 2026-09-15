@@ -22,6 +22,8 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
+    // `hindsightBankId` is the memory bank id (historical name, kept on purpose);
+    // a legacy `memoryBackend: "hindsight"` is normalized to Neo4j, never an error.
     const { name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources } = body;
 
     if (!name) {

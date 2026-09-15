@@ -45,22 +45,29 @@ cp .env.example .env      # edite as senhas antes de subir
 # 2a) Só o gateway
 docker compose up -d
 
-# 2b) Gateway + fontes de conhecimento (Neo4j + Open Notebook + SurrealDB)
-docker compose --profile extras up -d
+# 2b) Dependências embutidas: Neo4j + Open Notebook + SurrealDB NESTA máquina
+docker compose --profile bundled up -d
 ```
+
+O `up -d` sobe **só o gateway**, apontando para o Neo4j que `NEO4J_HTTP_URL`
+definir — o de um container bundled, um local ou um remoto pela Tailscale. O
+profile `bundled` é opt-in porque as dependências vêm embutidas mas **não
+obrigatórias** (`depends_on: required: false`).
 
 O dashboard fica em `http://localhost:20129`. A senha inicial vem de `INITIAL_PASSWORD`
 no `.env`.
 
 ### Dependências opcionais
 
-As fontes de conhecimento são ativadas por **profiles** do Docker Compose — o que você não
-usa, não sobe:
+As fontes de conhecimento vêm declaradas no `docker-compose.yml` e são ativadas por
+**profiles** do Docker Compose — o que você não usa, não sobe:
+
+O Neo4j é o **único** backend de memória de identidade (o Hindsight foi removido).
 
 | Fonte | Serviço | Profile | Porta |
 |---|---|---|---|
-| Memória por bank (Neo4j) | `neo4j` | `extras` | 7474 / 7687 |
-| Biblioteca documental (Open Notebook) | `open-notebook` + `surrealdb` | `extras` | 5055 / 8502 |
+| Memória por bank (Neo4j) | `neo4j` | `bundled` | 7474 / 7687 |
+| Biblioteca documental (Open Notebook) | `open-notebook` + `surrealdb` | `bundled` | 5055 / 8502 |
 | Notion (read-only) | — externo — | — | API pública |
 
 Embeddings locais via Ollama (`bge-m3`) são recomendados para busca semântica no Open

@@ -19,10 +19,10 @@ import Tooltip from "./components/Tooltip";
 import SecurityWarning from "./components/SecurityWarning";
 import SourcesSection, { emptyKeySources } from "./components/SourcesSection";
 
-const MEMORY_BACKEND_LABELS = { hindsight: "Hindsight", neo4j: "Neo4j" };
+const MEMORY_BACKEND_LABELS = { neo4j: "Neo4j" };
 
 function effectiveMemoryBackend(profile, globalBackend) {
-  return profile?.memoryBackend || globalBackend || "hindsight";
+  return profile?.memoryBackend || globalBackend || "neo4j";
 }
 
 export default function APIPageClient({ machineId }) {
@@ -47,7 +47,7 @@ export default function APIPageClient({ machineId }) {
   const [tunnelDashboardAccess, setTunnelDashboardAccess] = useState(false);
   const [globalInstructions, setGlobalInstructions] = useState("");
   const [globalInstructionsStatus, setGlobalInstructionsStatus] = useState("");
-  const [globalMemoryBackend, setGlobalMemoryBackend] = useState("hindsight");
+  const [globalMemoryBackend, setGlobalMemoryBackend] = useState("neo4j");
 
  // Cloudflare Tunnel state
   const [tunnelChecking, setTunnelChecking] = useState(true);
@@ -224,7 +224,7 @@ export default function APIPageClient({ machineId }) {
         setHasPassword(data.hasPassword || false);
         setTunnelDashboardAccess(data.tunnelDashboardAccess || false);
         setGlobalInstructions(data.globalInstructions || "");
-        setGlobalMemoryBackend(data.memoryBackend || "hindsight");
+        setGlobalMemoryBackend(data.memoryBackend || "neo4j");
       }
       if (statusRes.ok) {
         const data = await statusRes.json();
@@ -1148,8 +1148,7 @@ export default function APIPageClient({ machineId }) {
                     Combo: {combos.find((combo) => combo.id === key.comboId)?.name || "Not assigned"}
                     {" · "}Memory: {key.memoryEnabled ? key.hindsightBankId || "Not assigned" : "Disabled"}
                     {key.memoryEnabled ? ` (${MEMORY_BACKEND_LABELS[effectiveMemoryBackend(key, globalMemoryBackend)]})` : ""}
-                    {key.mentalModelId && effectiveMemoryBackend(key, globalMemoryBackend) === "hindsight"
-                      ? ` · Mental model: ${key.mentalModelId}` : ""}
+
                   </p>
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
@@ -1250,14 +1249,9 @@ export default function APIPageClient({ machineId }) {
               disabled={!profileForm.memoryEnabled}
             >
               <option value="">Herda config global/auto ({MEMORY_BACKEND_LABELS[globalMemoryBackend]})</option>
-              <option value="hindsight">Hindsight</option>
               <option value="neo4j">Neo4j</option>
             </select>
           </label>
-          {profileForm.memoryEnabled && effectiveMemoryBackend(profileForm, globalMemoryBackend) === "hindsight" &&
-            <p className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-text-muted">
-              A mental model will be created automatically and refreshed every 15 minutes when new memories make it stale.
-            </p>}
           <label className="text-sm font-medium">
             SOUL.md
             <textarea
@@ -1326,14 +1320,9 @@ export default function APIPageClient({ machineId }) {
               disabled={editingKey.memoryEnabled === false}
             >
               <option value="">Herda config global/auto ({MEMORY_BACKEND_LABELS[globalMemoryBackend]})</option>
-              <option value="hindsight">Hindsight</option>
               <option value="neo4j">Neo4j</option>
             </select>
           </label>
-          {editingKey.memoryEnabled !== false
-            && effectiveMemoryBackend(editingKey, globalMemoryBackend) === "hindsight"
-            && <Input label="Automatic Mental Model"
-            value={editingKey.mentalModelId || "Created automatically when saved"} readOnly />}
           <label className="text-sm font-medium">
             SOUL.md
             <textarea className="mt-1 min-h-64 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm"

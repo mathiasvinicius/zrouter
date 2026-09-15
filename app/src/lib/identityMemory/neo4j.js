@@ -137,13 +137,51 @@ function formatRecall(bank, items) {
   return lines.length > 1 ? lines.join("\n") : "";
 }
 
+/**
+ * Register a memory bank in Neo4j.
+ *
+ * MERGE (never CREATE) keyed on `id` — the property every recall query matches
+ * against Memory.bank — and ON CREATE only: an existing bank (for example
+ * ViniciusMathias, which carries mission/background/disposition_json) must never
+ * be overwritten. Fail-open: a Neo4j failure must not block creating the key.
+ */
 export async function ensureBank(bankId, name) {
   const bank = validateBankId(bankId);
-  return { id: bank, name: name || bank };
+  const now = new Date().toISOString();
+  try {
+    const results = await execute([statement(`
+      MERGE (b:Bank {id: $bank})
+      ON CREATE SET b.name = $name, b.source = 'zrouter', b.created_at = $now
+      RETURN b.id AS id, b.name AS name, b.created_at AS created_at`,
+      { bank, name: name || bank, now })], 5000);
+    const [id, resolvedName, createdAt] = rows(results[0])[0] || [];
+    return { id: id || bank, name: resolvedName || name || bank, created_at: createdAt || null };
+  } catch (error) {
+    console.warn(`[IdentityMemory][neo4j] ensureBank failed for bank ${bank}: ${error.message}`);
+    return { id: bank, name: name || bank, created_at: null };
+  }
 }
 
-export async function ensureMentalModel(_bankId, mentalModelId) {
-  return { id: mentalModelId || null, disabled: true };
+/**
+ * Same contract as ensureBank: create the MentalModel only if it is missing, so
+ * an existing model (bank + id, read by mentalModelForProfile) is left untouched.
+ */
+export async function ensureMentalModel(bankId, mentalModelId) {
+  const bank = validateBankId(bankId);
+  const id = String(mentalModelId || "").trim();
+  if (!id) return { id: null, disabled: true };
+  const now = new Date().toISOString();
+  try {
+    const results = await execute([statement(`
+      MERGE (mm:MentalModel {bank: $bank, id: $id})
+      ON CREATE SET mm.content = '', mm.created_at = $now, mm.source = 'zrouter'
+      RETURN mm.id AS id`,
+      { bank, id, now })], 5000);
+    return { id: rows(results[0])[0]?.[0] || id, disabled: false };
+  } catch (error) {
+    console.warn(`[IdentityMemory][neo4j] ensureMentalModel failed for bank ${bank}: ${error.message}`);
+    return { id, disabled: false };
+  }
 }
 
 export async function mentalModelForProfile(profile) {

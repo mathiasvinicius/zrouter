@@ -23,17 +23,18 @@ afterEach(() => {
 });
 
 describe("identity-memory backend selection", () => {
-  it("uses Hindsight by default and lets a profile override the global backend", () => {
+  it("uses Neo4j by default and coerces an inherited Hindsight value", () => {
     delete process.env.IDENTITY_MEMORY_BACKEND;
-    expect(getDefaultMemoryBackend()).toBe("hindsight");
+    expect(getDefaultMemoryBackend()).toBe("neo4j");
 
     process.env.IDENTITY_MEMORY_BACKEND = "neo4j";
     expect(getMemoryBackend({ memoryBackend: null })).toBe("neo4j");
-    expect(getMemoryBackend({ memoryBackend: "hindsight" })).toBe("hindsight");
+    // Entrega 4 — Hindsight was removed; a legacy value is coerced, never an error.
+    expect(getMemoryBackend({ memoryBackend: "hindsight" })).toBe("neo4j");
   });
 
   it("routes profile list operations to Neo4j", async () => {
-    process.env.IDENTITY_MEMORY_BACKEND = "hindsight";
+    process.env.IDENTITY_MEMORY_BACKEND = "hindsight"; // legacy value must still route to Neo4j
     process.env.NEO4J_USER = "test-user";
     process.env.NEO4J_PASSWORD = "test-password";
     globalThis.fetch = vi.fn(async () => ({

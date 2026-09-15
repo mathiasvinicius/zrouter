@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { resolveMemoryProfile } from "../../src/lib/identityMemory/profileConfig.js";
 
 describe("API-key optional identity and memory options", () => {
-  it("allows a profile with Hindsight disabled and no bank", () => {
+  it("allows a profile with memory disabled and no bank", () => {
     expect(resolveMemoryProfile({
       enabled: false,
       bankId: "",
@@ -16,7 +16,7 @@ describe("API-key optional identity and memory options", () => {
     });
   });
 
-  it("requires a valid bank only when Hindsight is enabled", () => {
+  it("requires a valid bank only when memory is enabled", () => {
     expect(() => resolveMemoryProfile({ enabled: true, bankId: "", name: "test" }))
       .toThrow(/bank ID is required/i);
     expect(() => resolveMemoryProfile({ enabled: true, bankId: "invalid bank", name: "test" }))
@@ -58,6 +58,18 @@ describe("API-key optional identity and memory options", () => {
       memoryBackend: "",
       name: "EVE",
     }).memoryBackend).toBeNull();
+  });
+
+  it("coerces a legacy Hindsight backend to Neo4j instead of erroring", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolveMemoryProfile({
+      enabled: true,
+      bankId: "eve",
+      memoryBackend: "hindsight",
+      name: "EVE",
+    }).memoryBackend).toBe("neo4j");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("rejects an unsupported per-profile backend", () => {

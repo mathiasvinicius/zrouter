@@ -1,6 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
 import { getAdapter } from "../driver.js";
 
+// The apiKeys.memoryBackend CHECK only accepts NULL or 'neo4j' (Entrega 4).
+// Coerce anything else (a legacy 'hindsight' value) so a direct repo write can
+// never trip the constraint — the API layer already normalizes it too.
+function storedMemoryBackend(value) {
+  return String(value || "").trim().toLowerCase() === "neo4j" ? "neo4j" : null;
+}
+
 function rowToKey(row) {
   if (!row) return null;
   return {
@@ -10,6 +17,8 @@ function rowToKey(row) {
     machineId: row.machineId,
     comboId: row.comboId || null,
     soul: row.soul || "",
+    // Historical column name — it stores the Neo4j bank id (Memory.bank).
+    // Renaming it would be a destructive migration; Neo4j is the only backend.
     hindsightBankId: row.hindsightBankId || null,
     memoryBackend: row.memoryBackend || null,
     mentalModelId: row.mentalModelId || null,
@@ -85,7 +94,7 @@ export async function createApiKey(name, machineId, profile = {}) {
     comboId: profile.comboId || null,
     soul: profile.soul || "",
     hindsightBankId: profile.hindsightBankId || null,
-    memoryBackend: profile.memoryBackend || null,
+    memoryBackend: storedMemoryBackend(profile.memoryBackend),
     mentalModelId: profile.mentalModelId || null,
     memoryEnabled: profile.memoryEnabled !== false,
     isService: profile.isService === true,
@@ -116,7 +125,7 @@ export async function updateApiKey(id, data) {
       `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, comboId = ?, soul = ?,
        hindsightBankId = ?, memoryBackend = ?, mentalModelId = ?, memoryEnabled = ?, sources = ?, isService = ?, isActive = ?, updatedAt = ? WHERE id = ?`,
       [merged.key, merged.name, merged.machineId, merged.comboId || null, merged.soul || "",
-        merged.hindsightBankId || null, merged.memoryBackend || null, merged.mentalModelId || null, merged.memoryEnabled ? 1 : 0, serializeSources(merged.sources),
+        merged.hindsightBankId || null, storedMemoryBackend(merged.memoryBackend), merged.mentalModelId || null, merged.memoryEnabled ? 1 : 0, serializeSources(merged.sources),
         merged.isService ? 1 : 0, merged.isActive ? 1 : 0, merged.updatedAt, id]
     );
     result = merged;

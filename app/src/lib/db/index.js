@@ -81,6 +81,9 @@ export async function exportDb() {
     apiKeys: db.all(`SELECT * FROM apiKeys`).map((r) => ({
       id: r.id, key: r.key, name: r.name, machineId: r.machineId,
       comboId: r.comboId, soul: r.soul || "", hindsightBankId: r.hindsightBankId,
+      // memoryBackend was omitted from exports; restore it so a backup/restore
+      // round-trip keeps the (now Neo4j-only) backend selection.
+      memoryBackend: r.memoryBackend,
       mentalModelId: r.mentalModelId, memoryEnabled: r.memoryEnabled === 1,
       sources: parseJson(r.sources, {}),
       isService: r.isService === 1, isActive: r.isActive === 1,

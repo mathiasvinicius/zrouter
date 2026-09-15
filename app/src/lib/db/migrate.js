@@ -145,7 +145,8 @@ function importLegacyMain(adapter, data) {
       `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, memoryBackend, mentalModelId, memoryEnabled, sources, isService, isActive, createdAt, updatedAt)
        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [k.id, k.key, k.name || null, k.machineId || null, k.comboId || null, k.soul || "",
-        k.hindsightBankId || null, k.memoryBackend || null, k.mentalModelId || null, k.memoryEnabled === false ? 0 : 1,
+        k.hindsightBankId || null, k.memoryBackend === "hindsight" ? "neo4j" : k.memoryBackend || null,
+        k.mentalModelId || null, k.memoryEnabled === false ? 0 : 1,
         k.sources && typeof k.sources === "object" ? stringifyJson(k.sources) : "{}", k.isService ? 1 : 0,
         k.isActive === false ? 0 : 1, k.createdAt || new Date().toISOString(),
         k.updatedAt || k.createdAt || new Date().toISOString()]

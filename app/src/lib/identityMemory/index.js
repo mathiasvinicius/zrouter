@@ -1,32 +1,33 @@
-import * as hindsight from "./hindsight.js";
 import * as neo4j from "./neo4j.js";
 
 export { isTrivialMemoryText, userTextWithoutInjectedContext } from "./common.js";
 
-const IMPLEMENTATIONS = { hindsight, neo4j };
+// Entrega 4 — Neo4j is the only identity-memory backend. The Hindsight
+// implementation is gone (it synthesized memory through an LLM and burned
+// tokens), so any inherited value is coerced instead of erroring a request.
+const DEFAULT_MEMORY_BACKEND = "neo4j";
+const IMPLEMENTATIONS = { neo4j };
 const warnedValues = new Set();
 
-function warnUnknown(value, source) {
-  const warningKey = `${source}:${value}`;
-  if (warnedValues.has(warningKey)) return;
-  warnedValues.add(warningKey);
-  console.warn(`[IdentityMemory] Unknown ${source} backend "${value}"; using the configured default`);
+// Structured, once per (source, value), and never carrying profile data.
+function coerce(value, source) {
+  const configured = String(value || "").trim().toLowerCase();
+  if (!configured || configured === DEFAULT_MEMORY_BACKEND) return DEFAULT_MEMORY_BACKEND;
+  const warningKey = `${source}:${configured}`;
+  if (!warnedValues.has(warningKey)) {
+    warnedValues.add(warningKey);
+    console.warn(`[IdentityMemory] ${source} memory backend "${configured}" is not supported; using "${DEFAULT_MEMORY_BACKEND}"`);
+  }
+  return DEFAULT_MEMORY_BACKEND;
 }
 
 export function getDefaultMemoryBackend() {
-  const configured = String(process.env.IDENTITY_MEMORY_BACKEND || "").trim().toLowerCase();
-  if (!configured) return "hindsight";
-  if (IMPLEMENTATIONS[configured]) return configured;
-  warnUnknown(configured, "global");
-  return "hindsight";
+  return coerce(process.env.IDENTITY_MEMORY_BACKEND, "global");
 }
 
 export function getMemoryBackend(profile) {
   const configured = String(profile?.memoryBackend || "").trim().toLowerCase();
-  if (!configured) return getDefaultMemoryBackend();
-  if (IMPLEMENTATIONS[configured]) return configured;
-  warnUnknown(configured, "profile");
-  return getDefaultMemoryBackend();
+  return configured ? coerce(configured, "profile") : getDefaultMemoryBackend();
 }
 
 function implementation(profile) {
