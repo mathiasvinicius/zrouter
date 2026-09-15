@@ -10,6 +10,7 @@ import {
 } from "../services/auth.js";
 import { getSettings, getApiKeyByValue, getComboById } from "@/lib/localDb";
 import { mentalModelForProfile, recallForProfile, retainForProfile } from "@/lib/identityMemory/index.js";
+import { recallSourcesForKey, capabilitiesBlockForKey, sourcesRecallMaxChars, sourcesQueryFromBody } from "@/lib/sources/context.js";
 import { handleAntigravityQuotaError, clearAntigravityStrikes } from "../services/antigravityQuota.js";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
@@ -93,9 +94,12 @@ export async function handleChat(request, clientRawRequest = null) {
     body.model = combo.name;
     if (clientRawRequest?.body) clientRawRequest.body.model = combo.name;
     memoryProfile = profile;
-    const [mentalModel, memory] = await Promise.all([
+    // Same query derivation the memory recall uses — delegated, not duplicated.
+    const sourcesQuery = sourcesQueryFromBody(body);
+    const [mentalModel, memory, sources] = await Promise.all([
       mentalModelForProfile(profile),
       recallForProfile(profile, body),
+      recallSourcesForKey(profile, sourcesQuery, settings),
     ]);
     identityContext = {
       id: profile.id,
@@ -106,6 +110,10 @@ export async function handleChat(request, clientRawRequest = null) {
       mentalModelId: profile.mentalModelId,
       mentalModel,
       memory,
+      // Sources and capabilities ride along with the identity blocks (part A2/B1).
+      sources,
+      sourcesMaxChars: sourcesRecallMaxChars(settings),
+      capabilities: capabilitiesBlockForKey(profile),
     };
   }
 
