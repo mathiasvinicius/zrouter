@@ -1,0 +1,90 @@
+# REQUIREMENTS — Correção do crash em /dashboard/providers/[id]
+
+**Contexto:** a página de provider do ZRouter quebrava no browser com "This page couldn't load".
+Causa raiz já identificada e corrigida por EVE: `DiscoverModelsModal.js` chamava `useCallback()`
+sem importá-lo de `react` (ReferenceError em runtime — invisível para o bundler).
+
+**Bug já corrigido:** `src/app/(dashboard)/dashboard/providers/[id]/DiscoverModelsModal.js`
+linha 3 agora é `import { useCallback, useEffect, useMemo, useState } from "react";`
+
+**Teste de regressão já criado:** `tests/unit/react-hook-imports.test.js` — percorre `src/`,
+detecta qualquer hook do React usado sem import. Validado: falha quando o bug é reintroduzido.
+
+---
+
+## SUA TAREFA
+
+### 1. Auditoria da mesma classe de bug
+Varra `src/` e `open-sse/` procurando outros erros que só aparecem no browser:
+- hooks do React usados sem import (o teste novo cobre, mas confirme variações:
+  `React.useState`, hooks de `next/navigation`, `next/link`)
+- imports de `@/shared/components` que não existem no barrel
+- imports relativos que apontam para arquivo inexistente
+- `useParams`/`useSearchParams`/`useRouter` usados sem import
+- componentes default-exported usados como named import (e vice-versa)
+
+Reporte o que encontrar ANTES de corrigir. Se não houver nada, diga explicitamente.
+
+### 2. Verificar a página de provider em estado vazio
+O banco do ZRouter está vazio (0 conexões, 0 provider-nodes). A página abre com HTTP 200
+no servidor mas precisa renderizar corretamente sem dados. Confirme lendo o código que:
+- `/dashboard/providers/antigravity` (ou qualquer id) renderiza sem crash quando
+  `/api/providers` retorna `{"connections":[]}` e `/api/provider-nodes` retorna `{"nodes":[]}`
+- o componente `ModelSyncControls` não quebra com `customModels=[]`
+- `DiscoverModelsModal` só monta quando `isOpen=true` (não dispara fetch no load da página)
+
+### 3. Verificar as rotas da Entrega 2
+Leia os handlers e confirme que não quebram com provider sem conexão:
+- `src/app/api/providers/[id]/models/discover/route.js`
+- `src/app/api/providers/[id]/models/sync/route.js`
+Teste por curl contra `http://127.0.0.1:20129` (o container está no ar):
+```
+curl -s -X POST http://127.0.0.1:20129/api/providers/antigravity/models/discover \
+  -H 'Content-Type: application/json' -d '{"ignoreCache":false}'
+curl -s -X POST http://127.0.0.1:20129/api/providers/antigravity/models/sync
+```
+Esperado: erro claro em JSON (não 500 cru, não HTML de crash). Se devolver 500 sem
+mensagem, corrija para devolver `{error: "..."}` com status 4xx quando não há conexão.
+
+### 4. Testes
+Rode e garanta verde:
+```
+cd tests
+npx vitest run --config vitest.config.js unit/react-hook-imports.test.js \
+  unit/sources-contract.test.js unit/sources-migration.test.js unit/sources-status.test.js \
+  unit/sources-opennotebook-real.test.js unit/color-themes.test.js \
+  unit/model-discover-endpoint.test.js unit/model-auto-sync.test.js \
+  unit/antigravity-oauth-client.test.js
+```
+Nota: `sources-status` precisa de `NEO4J_AUTH` no ambiente —
+`export $(grep -E '^NEO4J_' /opt/containers/neo4j/.env | xargs)` antes de rodar.
+
+### 5. Build e commit
+```
+npm run build     # deve compilar sem erro
+```
+Commit único:
+```
+fix(providers): import missing useCallback in DiscoverModelsModal
+
+The provider detail page crashed in the browser ("This page couldn't load")
+because DiscoverModelsModal called useCallback() without importing it — a
+runtime ReferenceError invisible to the bundler.
+
+- add useCallback to the react import
+- add tests/unit/react-hook-imports.test.js regression guard (scans src/ for
+  any React hook used without an import)
+[+] demais correções da auditoria, se houver
+```
+
+## O QUE NÃO FAZER
+- Não tocar no 9Router de produção (porta 20128) nem em containers de produção
+- Não commitar `.env`, `data/`, `docker-compose.override.yml` nem logs
+- Não imprimir credenciais, chaves ou tokens em logs/commit
+- Não alterar `shared.js` (credenciais OAuth já migradas para env)
+- Não rodar `docker compose down -v` nem apagar volumes
+- Não fazer push (EVE revisa e publica)
+
+## AO FINAL
+Imprima: (a) achados da auditoria, (b) resultado dos curls, (c) saída dos testes,
+(d) resultado do build, (e) hash do commit.

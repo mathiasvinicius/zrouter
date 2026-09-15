@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Modal } from "@/shared/components";
 import { cn } from "@/shared/utils/cn";
 
