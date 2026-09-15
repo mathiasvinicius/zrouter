@@ -17,6 +17,7 @@ import EndpointRow from "./components/EndpointRow";
 import StatusAlert from "./components/StatusAlert";
 import Tooltip from "./components/Tooltip";
 import SecurityWarning from "./components/SecurityWarning";
+import SourcesSection, { emptyKeySources } from "./components/SourcesSection";
 
 const MEMORY_BACKEND_LABELS = { hindsight: "Hindsight", neo4j: "Neo4j" };
 
@@ -32,6 +33,7 @@ export default function APIPageClient({ machineId }) {
   const [newKeyName, setNewKeyName] = useState("");
   const [profileForm, setProfileForm] = useState({
     comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true,
+    sources: emptyKeySources(),
   });
   const [editingKey, setEditingKey] = useState(null);
   const [memoryView, setMemoryView] = useState(null);
@@ -667,7 +669,7 @@ export default function APIPageClient({ machineId }) {
         setCreatedKey(data.key);
         await fetchData();
         setNewKeyName("");
-        setProfileForm({ comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true });
+        setProfileForm({ comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true, sources: emptyKeySources() });
         setShowAddModal(false);
       }
     } catch (error) {
@@ -1163,7 +1165,11 @@ export default function APIPageClient({ machineId }) {
                     <span className="material-symbols-outlined text-[18px]">psychology</span>
                   </button>
                   <button
-                    onClick={() => setEditingKey({ ...key, memoryBackend: key.memoryBackend || "" })}
+                    onClick={() => setEditingKey({
+                      ...key,
+                      memoryBackend: key.memoryBackend || "",
+                      sources: key.sources && typeof key.sources === "object" ? key.sources : emptyKeySources(),
+                    })}
                     className="p-2 hover:bg-primary/10 rounded text-primary opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                     title="Edit identity and memory"
                   >
@@ -1266,6 +1272,10 @@ export default function APIPageClient({ machineId }) {
               onChange={(event) => setProfileForm((value) => ({ ...value, memoryEnabled: event.target.checked }))} />
             Enable long-term memory
           </label>
+          <SourcesSection
+            sources={profileForm.sources}
+            onChange={(sources) => setProfileForm((value) => ({ ...value, sources }))}
+          />
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth
               disabled={!newKeyName.trim() || !profileForm.comboId
@@ -1335,6 +1345,10 @@ export default function APIPageClient({ machineId }) {
               onChange={(event) => setEditingKey((value) => ({ ...value, memoryEnabled: event.target.checked }))} />
             Enable long-term memory
           </label>
+          <SourcesSection
+            sources={editingKey.sources}
+            onChange={(sources) => setEditingKey((value) => ({ ...value, sources }))}
+          />
           <div className="flex gap-2">
             <Button fullWidth onClick={handleSaveProfile}
               disabled={!editingKey.comboId

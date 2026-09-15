@@ -3,7 +3,7 @@
 // pre-change safety backup in migrate.js: when the stored version is lower,
 // one lightweight DB backup is taken before applying schema changes. Forgetting
 // to bump only skips that backup — it does NOT break the additive auto-sync.
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const PRAGMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -87,6 +87,7 @@ export const TABLES = {
       memoryBackend: "TEXT CHECK (memoryBackend IS NULL OR memoryBackend IN ('hindsight', 'neo4j'))",
       mentalModelId: "TEXT",
       memoryEnabled: "INTEGER DEFAULT 1",
+      sources: "TEXT NOT NULL DEFAULT '{}'",
       isService: "INTEGER DEFAULT 0",
       isActive: "INTEGER DEFAULT 1",
       createdAt: "TEXT NOT NULL",

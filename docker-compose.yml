@@ -12,6 +12,7 @@ services:
     env_file:
       - ./.env
       - /opt/containers/neo4j/.env
+      - /opt/containers/open-notebook/.env
     volumes:
       - ./data:/app/data
     environment:

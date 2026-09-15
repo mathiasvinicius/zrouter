@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { deleteApiKey, getApiKeyById, getComboById, updateApiKey } from "@/lib/localDb";
 import { ensureBank, ensureMentalModel } from "@/lib/identityMemory/index.js";
 import { resolveMemoryProfile } from "@/lib/identityMemory/profileConfig.js";
+import { normalizeKeySources } from "@/lib/db/repos/apiKeysRepo.js";
 
 // GET /api/keys/[id] - Get single key
 export async function GET(request, { params }) {
@@ -22,7 +23,7 @@ async function updateKey(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { isActive, name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled } = body;
+    const { isActive, name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -39,6 +40,7 @@ async function updateKey(request, { params }) {
       updateData.comboId = comboId;
     }
     if (soul !== undefined) updateData.soul = String(soul);
+    if (sources !== undefined) updateData.sources = normalizeKeySources(sources);
     if (hindsightBankId !== undefined || memoryBackend !== undefined || memoryEnabled !== undefined) {
       let memoryProfile;
       try {

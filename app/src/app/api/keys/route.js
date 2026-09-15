@@ -3,6 +3,7 @@ import { getApiKeys, createApiKey, getComboById } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { ensureBank, ensureMentalModel } from "@/lib/identityMemory/index.js";
 import { resolveMemoryProfile } from "@/lib/identityMemory/profileConfig.js";
+import { normalizeKeySources } from "@/lib/db/repos/apiKeysRepo.js";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled } = body;
+    const { name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -50,6 +51,7 @@ export async function POST(request) {
     const apiKey = await createApiKey(name, machineId, {
       comboId,
       soul: typeof soul === "string" ? soul : "",
+      sources: normalizeKeySources(sources),
       ...memoryProfile,
     });
 
@@ -63,6 +65,7 @@ export async function POST(request) {
       memoryBackend: apiKey.memoryBackend,
       mentalModelId: apiKey.mentalModelId,
       memoryEnabled: apiKey.memoryEnabled,
+      sources: apiKey.sources,
     }, { status: 201 });
   } catch (error) {
     console.log("Error creating key:", error);
