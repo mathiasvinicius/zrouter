@@ -1,4 +1,4 @@
-# Skills do 9Router Zenith
+# Skills do ZRouter
 
 Estas instruções são servidas pelo próprio 9Router em `/skills/`. Use a origem
 do seu servidor (local ou Tailscale), não os arquivos da versão pública antiga.
@@ -18,7 +18,7 @@ descoberta de modelos e seleção da combinação vinculada à chave.
 | Leitura de URL | [9router-web-fetch](9router-web-fetch/SKILL.md) |
 
 Exemplo para um cliente que consegue ler URLs: `Leia
-http://<host-remoto>:20128/skills/9router/SKILL.md e siga apenas as
+http://<seu-servidor>:20128/skills/9router/SKILL.md e siga apenas as
 capacidades realmente disponíveis à sua chave.` Não inclua a API key na URL.
 
 Para chamadas de API, configure `NINEROUTER_URL` com a mesma origem e

@@ -10,5 +10,12 @@ export async function register() {
 
     const { startModelCatalogSync } = await import("@/lib/modelCatalog/sync.js");
     startModelCatalogSync();
+
+    // One-shot Neo4j index/constraint bootstrap, once per process. Not awaited:
+    // an unreachable Neo4j must never delay (or block) the gateway boot, and the
+    // recall path is already fail-open.
+    import("@/lib/identityMemory/schema.js")
+      .then(({ ensureNeo4jSchema }) => ensureNeo4jSchema())
+      .catch((error) => console.warn(`[IdentityMemory][schema] bootstrap skipped: ${error.message}`));
   }
 }

@@ -47,11 +47,11 @@ function validateBankId(bankId) {
   return bank;
 }
 
-function statement(statementText, parameters) {
+export function statement(statementText, parameters) {
   return { statement: statementText, parameters, resultDataContents: ["row"] };
 }
 
-async function execute(statements, timeoutMs) {
+export async function execute(statements, timeoutMs) {
   const response = await fetch(databaseUrl(), {
     method: "POST",
     headers: {
@@ -70,7 +70,7 @@ async function execute(statements, timeoutMs) {
   return Array.isArray(payload?.results) ? payload.results : [];
 }
 
-function rows(result) {
+export function rows(result) {
   return Array.isArray(result?.data) ? result.data.map((entry) => entry?.row || []) : [];
 }
 

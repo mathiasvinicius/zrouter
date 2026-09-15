@@ -24,6 +24,20 @@ Banks and mental models are created on demand with `MERGE ... ON CREATE`, so an
 existing bank (`mission`, `background`, `disposition_json`, …) is never
 overwritten. Creating a key or changing its bank registers the new bank.
 
+## Neo4j schema bootstrap
+
+A clean Neo4j has no indexes: recall would scan every `Memory` node. On the
+first boot the gateway creates the schema it depends on — constraints
+`mem_id` (Memory.id) and `ent_name` (Entity.name), plus the indexes
+`mem_bank`, `ent_bank`, `mem_fact_type`, `mm_bank` and `bank_id`. All
+statements use `IF NOT EXISTS` and none is destructive, so the bootstrap is
+idempotent and safe against an existing database; it runs once per process,
+off the boot path, and a failure is logged and ignored (recall is fail-open).
+
+`GET /api/health/neo4j` reports `{ connected, indexes, constraints, missing }`
+so an operator can confirm the schema landed. A freshly created index fills
+in the background (`POPULATING` → `ONLINE`); recall stays correct meanwhile.
+
 API authentication is mandatory for public inference routes. Internal callers
 use an `isService` key. Service keys remain authenticated but do not force a
 combo and skip identity, recall and retain — this prevents a recall → router →

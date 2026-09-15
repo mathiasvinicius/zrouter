@@ -35,27 +35,75 @@ tokens e isolamento de conhecimento por chave de API.
 
 ## Instalação
 
+**Pré-requisitos:** Docker + Docker Compose v2. RAM sugerida: **4 GB** para o
+stack completo (gateway + Neo4j + Open Notebook); o gateway sozinho roda em 1 GB.
+Em host com ≤4 GB, baixe a memória do Neo4j no `.env` (`NEO4J_HEAP_MAX=512M`,
+`NEO4J_HEAP_INITIAL=256M`, `NEO4J_PAGECACHE=512M`).
+
 ```bash
 git clone https://github.com/mathiasvinicius/zrouter.git
 cd zrouter
+cp .env.example .env      # TROQUE TODAS AS SENHAS antes de subir
+```
 
-# 1) Configuração
-cp .env.example .env      # edite as senhas antes de subir
+### Modo A — stack completo nesta máquina
 
-# 2a) Só o gateway
-docker compose up -d
+Sobe o gateway **e** o Neo4j embutido, já otimizado:
 
-# 2b) Dependências embutidas: Neo4j + Open Notebook + SurrealDB NESTA máquina
+```bash
 docker compose --profile bundled up -d
 ```
 
-O `up -d` sobe **só o gateway**, apontando para o Neo4j que `NEO4J_HTTP_URL`
-definir — o de um container bundled, um local ou um remoto pela Tailscale. O
-profile `bundled` é opt-in porque as dependências vêm embutidas mas **não
-obrigatórias** (`depends_on: required: false`).
+Abra `http://localhost:20129` e entre com a senha de `INITIAL_PASSWORD`.
 
-O dashboard fica em `http://localhost:20129`. A senha inicial vem de `INITIAL_PASSWORD`
-no `.env`.
+### Modo B — usar Neo4j / Open Notebook que já existem
+
+```bash
+# no .env: NEO4J_HTTP_URL e OPEN_NOTEBOOK_URL apontando para os seus serviços
+docker compose up -d      # sobe só o gateway
+```
+
+O `up -d` sem profile sobe **só o gateway**. O profile `bundled` é opt-in porque
+as dependências vêm embutidas mas **não obrigatórias** (`depends_on: required: false`):
+se o Neo4j estiver fora do ar, o gateway sobe normalmente e o recall de memória
+simplesmente não injeta contexto.
+
+### Verificação pós-instalação
+
+```bash
+curl http://localhost:20129/api/health/neo4j
+```
+
+Resposta esperada em uma instalação saudável — `connected: true`, `missing: []`:
+
+```json
+{
+  "connected": true,
+  "indexes": [{ "name": "mem_bank", "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["Memory"], "properties": ["bank"] }, "..."],
+  "constraints": [{ "name": "mem_id", "type": "UNIQUENESS", "labelsOrTypes": ["Memory"], "properties": ["id"] }, "..."],
+  "missing": []
+}
+```
+
+`connected: false` significa que o gateway não alcançou o Neo4j — confira
+`NEO4J_HTTP_URL`, `NEO4J_USER` e `NEO4J_PASSWORD`. Se `missing` listar nomes, o
+bootstrap de schema ainda não rodou nesse processo: reinicie o gateway.
+
+### Segurança
+
+- **Troque todas as senhas default** do `.env` (`INITIAL_PASSWORD`, `JWT_SECRET`,
+  `API_KEY_SECRET`, `MACHINE_ID_SALT`, `NEO4J_AUTH`/`NEO4J_PASSWORD`,
+  `SURREAL_PASSWORD`, `OPEN_NOTEBOOK_ENCRYPTION_KEY`).
+- **Não exponha as portas na internet.** Todas as portas do compose fazem bind em
+  `127.0.0.1`; para acesso remoto use Tailscale/WireGuard ou outro túnel.
+- O Neo4j embutido escuta em `127.0.0.1:7474` / `127.0.0.1:7687`.
+
+### Escopo dos dados
+
+**Nenhum dado do autor é distribuído.** O banco nasce vazio: cada instalação cria
+as próprias chaves, banks e memórias. O que **não** nasce vazio é o schema —
+índices e constraints (`mem_bank`, `ent_bank`, `mem_id`, `ent_name`, …) são criados
+automaticamente no primeiro boot. Sem eles o recall varre o banco inteiro.
 
 ### Dependências opcionais
 
