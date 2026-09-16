@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { getProviderConnections } from "@/lib/db/repos/connectionsRepo.js";
-import { getHealthSnapshot, sweep } from "@/lib/credentialHealth/scheduler.js";
+import { getHealthSnapshot, sweep, startCredentialHealthScheduler } from "@/lib/credentialHealth/scheduler.js";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/providers/health — per-connection credential health for the dashboard.
 // Read-only: the scheduler owns the writes.
+//
+// The scheduler is also armed by initializeApp (layout bootstrap), but that only
+// runs once the Next module graph loads — a freshly restarted gateway with no
+// dashboard visit would otherwise leave health checks idle forever. Arming it here
+// too is idempotent (startCredentialHealthScheduler returns early if it is running)
+// and guarantees the checks come up on the first health read.
 export async function GET() {
   try {
+    startCredentialHealthScheduler();
     const [connections, health] = await Promise.all([
       getProviderConnections({ isActive: true }),
       Promise.resolve(getHealthSnapshot()),
