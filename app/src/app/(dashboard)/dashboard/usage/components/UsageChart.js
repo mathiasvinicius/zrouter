@@ -22,31 +22,50 @@ const fmtTokens = (n) => {
 
 const fmtCost = (n) => `$${(n || 0).toFixed(4)}`;
 
-export default function UsageChart({ period = "7d" }) {
+// Colour per key series. Fixed palette, brand-first, so each key keeps its colour
+// across re-sorts and refreshes (series are ordered by the server payload).
+const SERIES_COLORS = ["#033f7b", "#1461a3", "#5d94c4", "#f59e0b", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"];
+
+export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("tokens");
+  const [byKey, setByKey] = useState(false);
+  const [groups, setGroups] = useState([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/usage/chart?period=${period}`);
+      const params = new URLSearchParams({ period });
+      if (apiKey) params.set("apiKey", apiKey);
+      if (groupBy) params.set("groupBy", groupBy);
+      const res = await fetch(`/api/usage/chart?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        setData(json);
+        // groupBy=apiKey returns { groups, rows } — everything else is a plain array.
+        if (Array.isArray(json)) {
+          setByKey(false);
+          setData(json);
+        } else {
+          setByKey(true);
+          setData(json?.rows || []);
+          setGroups(json?.groups || []);
+        }
       }
     } catch (e) {
       console.error("Failed to fetch chart data:", e);
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [period, apiKey, groupBy]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const hasData = data.some((d) => d.tokens > 0 || d.cost > 0);
+  const hasData = byKey
+    ? data.some((d) => groups.some((g) => d[`${g.key}::tokens`] > 0 || d[`${g.key}::cost`] > 0))
+    : data.some((d) => d.tokens > 0 || d.cost > 0);
 
   return (
     <Card className="flex min-w-0 flex-col gap-3 p-3 sm:p-4">
@@ -104,11 +123,24 @@ export default function UsageChart({ period = "7d" }) {
                 borderRadius: "8px",
                 fontSize: "12px",
               }}
-              formatter={(value, name) =>
-                name === "tokens" ? [fmtTokens(value), "Tokens"] : [fmtCost(value), "Cost"]
-              }
+              formatter={(value, name) => {
+                if (byKey) return [viewMode === "tokens" ? fmtTokens(value) : fmtCost(value), name];
+                return name === "tokens" ? [fmtTokens(value), "Tokens"] : [fmtCost(value), "Cost"];
+              }}
             />
-            {viewMode === "tokens" ? (
+            {byKey ? groups.map((g, i) => (
+              <Area
+                key={g.key}
+                type="monotone"
+                dataKey={`${g.key}::${viewMode}`}
+                name={`${g.name}${g.unknown ? " (deleted)" : ""}`}
+                stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
+                strokeWidth={2}
+                fill="none"
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            )) : viewMode === "tokens" ? (
               <Area
                 type="monotone"
                 dataKey="tokens"
@@ -138,4 +170,6 @@ export default function UsageChart({ period = "7d" }) {
 
 UsageChart.propTypes = {
   period: PropTypes.string,
+  apiKey: PropTypes.string,
+  groupBy: PropTypes.string,
 };

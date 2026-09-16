@@ -18,6 +18,7 @@ import dynamic from "next/dynamic";
 // Lazy-load: keeps @xyflow/react out of the shared bundle until topology renders
 const ProviderTopology = dynamic(() => import("@/app/(dashboard)/dashboard/usage/components/ProviderTopology"), { ssr: false });
 import UsageChart from "@/app/(dashboard)/dashboard/usage/components/UsageChart";
+import ApiKeyUsageCard from "@/app/(dashboard)/dashboard/usage/components/ApiKeyUsageCard";
 
 function timeAgo(timestamp) {
   const diff = Math.floor((Date.now() - new Date(timestamp)) / 1000);
@@ -206,6 +207,7 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
 
   const sortBy = searchParams.get("sortBy") || "rawModel";
   const sortOrder = searchParams.get("sortOrder") || "asc";
+  const apiKeyFilter = searchParams.get("apiKey") || "";
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -261,7 +263,7 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
       setFetching(true);
     }
 
-    fetch(`/api/usage/stats?period=${period}`)
+    fetch(`/api/usage/stats?period=${period}${apiKeyFilter ? `&apiKey=${encodeURIComponent(apiKeyFilter)}` : ""}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) {
@@ -274,7 +276,7 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
         setLoading(false);
         setFetching(false);
       });
-  }, [period]);
+  }, [period, apiKeyFilter]);
 
   // SSE connection - real-time updates for activeRequests + recentRequests only
   useEffect(() => {
@@ -304,6 +306,15 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
 
     return () => es.close();
   }, []);
+
+  // Filter the whole view by key, reflected in the URL so it can be shared.
+  const setApiKeyFilter = useCallback((value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("apiKey", value);
+    else params.delete("apiKey");
+    params.set("tab", "overview");
+    router.replace(`/dashboard/usage?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
 
   const toggleSort = useCallback((tableType, field) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -480,8 +491,18 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
         </div>
       )}
 
-      {/* Token / Cost chart - sync period */}
-      {loading ? spinner : <UsageChart period={period} />}
+      {/* Usage by API key — where the traffic comes from */}
+      {loading ? spinner : (
+        <ApiKeyUsageCard
+          summary={stats.byApiKeySummary || {}}
+          totalRequests={stats.totalRequests || 0}
+          activeKey={apiKeyFilter}
+          onSelectKey={setApiKeyFilter}
+        />
+      )}
+
+      {/* Token / Cost chart - sync period, per key when filtered/grouped */}
+      {loading ? spinner : <UsageChart period={period} apiKey={apiKeyFilter} groupBy={apiKeyFilter ? "" : "apiKey"} />}
 
       {/* Table with dropdown selector */}
       <div className="flex flex-col gap-3">

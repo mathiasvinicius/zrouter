@@ -95,6 +95,8 @@ export default function APIPageClient({ machineId }) {
 
   // API key visibility toggle state
   const [visibleKeys, setVisibleKeys] = useState(new Set());
+  // Row to highlight when arriving from /dashboard/usage?apiKey=... via ?key=<id>.
+  const [focusKeyId, setFocusKeyId] = useState("");
 
   // Client-side local/remote detection (UI hint only, not a security gate)
   const [isRemoteHost, setIsRemoteHost] = useState(false);
@@ -301,6 +303,14 @@ export default function APIPageClient({ machineId }) {
       const combosData = await combosRes.json();
       if (keysRes.ok) {
         setKeys(keysData.keys || []);
+        // Deep link from the usage page. Read window.location directly: this
+        // component is not wrapped in Suspense, so useSearchParams would opt the
+        // whole page into client-side rendering.
+        const focused = new URLSearchParams(window.location.search).get("key") || "";
+        if (focused) {
+          setFocusKeyId(focused);
+          requestAnimationFrame(() => document.getElementById(focused)?.scrollIntoView({ block: "center", behavior: "smooth" }));
+        }
       }
       if (combosRes.ok) setCombos(combosData.combos || []);
     } catch (error) {
@@ -1115,7 +1125,8 @@ export default function APIPageClient({ machineId }) {
             {keys.map((key) => (
               <div
                 key={key.id}
-                className={`group flex items-center justify-between py-3 border-b border-black/[0.03] dark:border-white/[0.03] last:border-b-0 ${key.isActive === false ? "opacity-60" : ""}`}
+                id={key.id}
+                className={`group flex items-center justify-between py-3 border-b border-black/[0.03] dark:border-white/[0.03] last:border-b-0 ${key.isActive === false ? "opacity-60" : ""} ${focusKeyId === key.id ? "rounded-[10px] ring-2 ring-primary/40 bg-primary/5 px-2" : ""}`}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{key.name}</p>

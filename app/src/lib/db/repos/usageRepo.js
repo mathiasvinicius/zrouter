@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { createHash } from "node:crypto";
 import { getAdapter } from "../driver.js";
 import { parseJson, stringifyJson } from "../helpers/jsonCol.js";
 import { getMeta, setMeta } from "../helpers/metaStore.js";
@@ -7,6 +8,65 @@ function maskApiKey(key) {
   if (!key || typeof key !== "string") return null;
   if (key.length <= 8) return key.charAt(0) + "***";
   return key.slice(0, 8) + "***";
+}
+
+// Public identity for a stored apiKey value, never the key itself.
+// ponytail: sha256 first 8 hex chars via node:crypto — no new dep; the label only
+// needs to be stable and collision-cheap across a handful of deleted keys.
+function unknownKeyHash(key) {
+  return createHash("sha256").update(String(key)).digest("hex").slice(0, 8);
+}
+
+function apiKeyIdentity(rawKey, apiKeyMap) {
+  if (!rawKey || typeof rawKey !== "string") {
+    return { name: "Local (No API Key)", keyId: null, keyName: null, bank: null, masked: null, unknown: false };
+  }
+  const info = apiKeyMap[rawKey];
+  return {
+    name: info?.name || `desconhecida-${unknownKeyHash(rawKey)}`,
+    keyId: info?.id || null,
+    keyName: info?.name || null,
+    bank: info?.hindsightBankId || null,
+    masked: maskApiKey(rawKey),
+    unknown: !info,
+  };
+}
+
+// Handle used as the byApiKeySummary key AND as the ?apiKey= filter value.
+// The name, not the id: the URL has to be human-readable and shareable, and the
+// filter already unions every key sharing a name. The 8-char mask can never be
+// the handle (all keys from one machine share their first 12 chars).
+function apiKeyHandle(identity) {
+  return identity.name || identity.keyId || "local-no-key";
+}
+
+// One aggregate row per key — what the "Usage by API key" section and the
+// ?apiKey= filter list read. Keyed by the resolved key id (deleted keys by
+// "desconhecida-<hash>"), never by the raw key.
+function addToKeySummary(stats, identity, timestamp, vals) {
+  const handle = apiKeyHandle(identity);
+  const s = stats.byApiKeySummary[handle] || (stats.byApiKeySummary[handle] = {
+    name: identity.name, keyId: identity.keyId, memoryBankId: identity.bank,
+    unknown: identity.unknown,
+    requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0,
+    firstUsed: null, lastUsed: null,
+  });
+  s.requests += vals.requests ?? 1;
+  s.promptTokens += vals.promptTokens || 0;
+  s.completionTokens += vals.completionTokens || 0;
+  s.cachedTokens += vals.cachedTokens || 0;
+  s.cost += vals.cost || 0;
+  if (!s.lastUsed || new Date(timestamp) > new Date(s.lastUsed)) s.lastUsed = timestamp;
+  if (!s.firstUsed || new Date(timestamp) < new Date(s.firstUsed)) s.firstUsed = timestamp;
+}
+
+// Timestamp-only update for the history overlay (the daily rollup only stores a
+// date, so exact lastUsed comes from usageHistory).
+function touchKeySummary(stats, identity, timestamp) {
+  const s = stats.byApiKeySummary[apiKeyHandle(identity)];
+  if (!s) return;
+  if (!s.lastUsed || new Date(timestamp) > new Date(s.lastUsed)) s.lastUsed = timestamp;
+  if (!s.firstUsed || new Date(timestamp) < new Date(s.firstUsed)) s.firstUsed = timestamp;
 }
 
 const PENDING_TIMEOUT_MS = 60 * 1000;
@@ -95,6 +155,58 @@ function aggregateEntryToDay(day, entry) {
   const endpoint = entry.endpoint || "Unknown";
   const epKey = `${endpoint}|${entry.model}|${entry.provider || "unknown"}`;
   addToCounter(day.byEndpoint, epKey, { ...vals, meta: { endpoint, rawModel: entry.model, provider: entry.provider } });
+}
+
+// Append one usageHistory row into stats.byApiKey. Grouping key is unchanged
+// (masked|model|provider) so the existing table keeps working; the row now also
+// carries the resolved key id / bank and an `unknown` flag for deleted keys.
+function addApiKeyRow(stats, r, { promptTokens, completionTokens, cachedTokens, entryCost, providerDisplayName, apiKeyMap }) {
+  const rawKey = r.apiKey && typeof r.apiKey === "string" ? r.apiKey : null;
+  const apiKeyMasked = maskApiKey(rawKey);
+  const akKey = rawKey ? `${apiKeyMasked}|${r.model}|${r.provider || "unknown"}` : "local-no-key";
+  if (!stats.byApiKey[akKey]) {
+    const identity = apiKeyIdentity(rawKey, apiKeyMap);
+    stats.byApiKey[akKey] = { requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0, rawModel: r.model, provider: providerDisplayName, apiKeyMasked, keyName: identity.name, keyId: identity.keyId, memoryBankId: identity.bank, unknown: identity.unknown, apiKeyKey: apiKeyMasked || "local-no-key", lastUsed: r.timestamp };
+  }
+  const ake = stats.byApiKey[akKey];
+  ake.requests++; ake.promptTokens += promptTokens; ake.completionTokens += completionTokens; ake.cachedTokens += cachedTokens; ake.cost += entryCost;
+  if (new Date(r.timestamp) > new Date(ake.lastUsed)) ake.lastUsed = r.timestamp;
+  addToKeySummary(stats, apiKeyIdentity(rawKey, apiKeyMap), r.timestamp, { promptTokens, completionTokens, cachedTokens, cost: entryCost });
+}
+
+// Distinct apiKey values ever written to usageHistory — one query, so deleted
+// keys stay resolvable without scanning the history table per request.
+async function getSeenKeyValues(db) {
+  try {
+    const rows = db.all(`SELECT DISTINCT apiKey FROM usageHistory WHERE apiKey IS NOT NULL`);
+    return rows.map((r) => r.apiKey).filter((v) => typeof v === "string" && v);
+  } catch {
+    return [];
+  }
+}
+
+// Resolve an ?apiKey= filter (the display name or id that byApiKey exposes) to
+// the stored key values it covers. Accepts a comma-separated list.
+function resolveKeyFilter(filterValue, apiKeyMap, seenKeys = []) {
+  if (!filterValue) return null;
+  const wanted = String(filterValue).split(",").map((s) => s.trim()).filter(Boolean).map((s) => s.toLowerCase());
+  if (!wanted.length) return null;
+  const values = new Set();
+  for (const [raw, info] of Object.entries(apiKeyMap)) {
+    if (wanted.includes(String(info.name || "").toLowerCase()) || wanted.includes(String(info.id || "").toLowerCase())) {
+      values.add(raw);
+    }
+  }
+  // Deleted keys only exist as rows in usageHistory — match their "desconhecida-<hash>" label.
+  const hashLabels = wanted.filter((s) => s.startsWith("desconhecida-")).map((s) => s.slice("desconhecida-".length));
+  for (const raw of seenKeys) {
+    if (apiKeyMap[raw]) continue;
+    const label = `desconhecida-${unknownKeyHash(raw)}`;
+    if (wanted.includes(label.toLowerCase()) || hashLabels.includes(unknownKeyHash(raw)) || wanted.includes(raw.toLowerCase())) {
+      values.add(raw);
+    }
+  }
+  return values;
 }
 
 function pushToRing(entry) {
@@ -324,7 +436,16 @@ export async function getUsageHistory(filter = {}) {
   if (filter.endDate) { conds.push("timestamp <= ?"); params.push(new Date(filter.endDate).toISOString()); }
 
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-  const rows = db.all(`SELECT timestamp, provider, model, connectionId, apiKey, endpoint, cost, status, tokens FROM usageHistory ${where} ORDER BY id ASC`, params);
+  let rows = db.all(`SELECT timestamp, provider, model, connectionId, apiKey, endpoint, cost, status, tokens FROM usageHistory ${where} ORDER BY id ASC`, params);
+
+  if (filter.apiKey) {
+    const { getApiKeys } = await import("./apiKeysRepo.js");
+    const allApiKeys = await getApiKeys().catch(() => []);
+    const apiKeyMap = {};
+    for (const k of allApiKeys) apiKeyMap[k.key] = { name: k.name, id: k.id };
+    const keyFilter = resolveKeyFilter(filter.apiKey, apiKeyMap, await getSeenKeyValues(db));
+    rows = rows.filter((r) => keyFilter?.has(r.apiKey));
+  }
 
   return rows.map((r) => ({
     timestamp: r.timestamp, provider: r.provider, model: r.model,
@@ -343,7 +464,7 @@ function loadDaysInRange(adapter, maxDays) {
   return adapter.all(`SELECT dateKey, data FROM usageDaily WHERE dateKey >= ?`, [cutoffKey]);
 }
 
-export async function getUsageStats(period = "all") {
+export async function getUsageStats(period = "all", options = {}) {
   const db = await getAdapter();
 
   const [{ getProviderConnections }, { getApiKeys }, { getProviderNodes }] = await Promise.all([
@@ -366,12 +487,19 @@ export async function getUsageStats(period = "all") {
   let allApiKeys = [];
   try { allApiKeys = await getApiKeys(); } catch {}
   const apiKeyMap = {};
-  for (const k of allApiKeys) apiKeyMap[k.key] = { name: k.name, id: k.id, createdAt: k.createdAt };
+  for (const k of allApiKeys) apiKeyMap[k.key] = { name: k.name, id: k.id, createdAt: k.createdAt, hindsightBankId: k.hindsightBankId || null };
+
+  // Optional ?apiKey= filter (display name or id). One extra DISTINCT query, no N+1.
+  const keyFilter = options.apiKey
+    ? resolveKeyFilter(options.apiKey, apiKeyMap, await getSeenKeyValues(db))
+    : null;
+  const inFilter = (raw) => !keyFilter || keyFilter.has(raw);
 
   // recentRequests from live history (last 100 entries enough for 20 deduped)
-  const recentRows = db.all(`SELECT timestamp, provider, model, tokens, status FROM usageHistory ORDER BY id DESC LIMIT 100`);
+  const recentRows = db.all(`SELECT timestamp, provider, model, apiKey, tokens, status FROM usageHistory ORDER BY id DESC LIMIT 200`);
   const seen = new Set();
   const recentRequests = recentRows
+    .filter((r) => !keyFilter || keyFilter.has(r.apiKey))
     .map((r) => {
       const t = parseJson(r.tokens, {}) || {};
       return {
@@ -395,7 +523,7 @@ export async function getUsageStats(period = "all") {
   const stats = {
     totalRequests: 0,
     totalPromptTokens: 0, totalCompletionTokens: 0, totalCachedTokens: 0, totalCost: 0,
-    byProvider: {}, byModel: {}, byAccount: {}, byApiKey: {}, byEndpoint: {},
+    byProvider: {}, byModel: {}, byAccount: {}, byApiKey: {}, byApiKeySummary: {}, byEndpoint: {},
     last10Minutes: [],
     pending: pendingRequests,
     activeRequests: [],
@@ -429,9 +557,9 @@ export async function getUsageStats(period = "all") {
     stats.last10Minutes.push(bucketMap[ts]);
   }
   const recent10 = db.all(
-    `SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ? AND timestamp <= ?`,
+    `SELECT timestamp, apiKey, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ? AND timestamp <= ?`,
     [tenMinutesAgo.toISOString(), now.toISOString()]
-  );
+  ).filter((r) => inFilter(r.apiKey));
   for (const r of recent10) {
     const tt = new Date(r.timestamp).getTime();
     const minuteStart = Math.floor(tt / 60000) * 60000;
@@ -443,7 +571,11 @@ export async function getUsageStats(period = "all") {
     }
   }
 
-  const useDailySummary = period !== "24h" && period !== "today";
+  // ponytail: a per-key filter always reads usageHistory directly. usageDaily is
+  // keyed by (apiKey|model|provider) but its byProvider/byAccount/byEndpoint
+  // sub-maps lose the key, so a filtered long-range query cannot be answered from
+  // it. Add an apiKey-first rollup in usageDaily if history ranges get expensive.
+  const useDailySummary = period !== "24h" && period !== "today" && !keyFilter;
 
   if (useDailySummary) {
     const periodDays = { "7d": 7, "30d": 30, "60d": 60 };
@@ -500,17 +632,19 @@ export async function getUsageStats(period = "all") {
         if (dateKey > (stats.byAccount[accountKey].lastUsed || "")) stats.byAccount[accountKey].lastUsed = dateKey;
       }
 
-      for (const [akKey, ak] of Object.entries(day.byApiKey || {})) {
+      for (const ak of Object.values(day.byApiKey || {})) {
         const rawModel = ak.rawModel || "";
         const provider = ak.provider || "";
         const providerDisplayName = providerNodeNameMap[provider] || provider;
         const apiKeyVal = ak.apiKey;
-        const keyInfo = apiKeyVal ? apiKeyMap[apiKeyVal] : null;
-        const keyName = keyInfo?.name || (apiKeyVal ? apiKeyVal.slice(0, 8) + "..." : "Local (No API Key)");
+        const identity = apiKeyIdentity(apiKeyVal, apiKeyMap);
         const apiKeyMasked = maskApiKey(apiKeyVal);
         const apiKeyKey = apiKeyMasked || "local-no-key";
+        // Re-key on the masked value: the daily rollup is grouped by the raw key,
+        // which must never reach the response. Masked is a stable 8-char prefix.
+        const akKey = apiKeyVal ? `${apiKeyMasked}|${rawModel}|${provider || "unknown"}` : "local-no-key";
         if (!stats.byApiKey[akKey]) {
-          stats.byApiKey[akKey] = { requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0, rawModel, provider: providerDisplayName, apiKeyMasked, keyName, apiKeyKey, lastUsed: dateKey };
+          stats.byApiKey[akKey] = { requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0, rawModel, provider: providerDisplayName, apiKeyMasked, keyName: identity.name, keyId: identity.keyId, memoryBankId: identity.bank, unknown: identity.unknown, apiKeyKey, lastUsed: dateKey };
         }
         stats.byApiKey[akKey].requests += ak.requests || 0;
         stats.byApiKey[akKey].promptTokens += ak.promptTokens || 0;
@@ -518,6 +652,7 @@ export async function getUsageStats(period = "all") {
         stats.byApiKey[akKey].cachedTokens += ak.cachedTokens || 0;
         stats.byApiKey[akKey].cost += ak.cost || 0;
         if (dateKey > (stats.byApiKey[akKey].lastUsed || "")) stats.byApiKey[akKey].lastUsed = dateKey;
+        addToKeySummary(stats, identity, dateKey, { requests: ak.requests || 0, promptTokens: ak.promptTokens || 0, completionTokens: ak.completionTokens || 0, cachedTokens: ak.cachedTokens || 0, cost: ak.cost || 0 });
       }
 
       for (const [epKey, ep] of Object.entries(day.byEndpoint || {})) {
@@ -554,10 +689,10 @@ export async function getUsageStats(period = "all") {
         if (stats.byAccount[accountKey] && new Date(ts) > new Date(stats.byAccount[accountKey].lastUsed)) stats.byAccount[accountKey].lastUsed = ts;
       }
 
-      const apiKeyKey = (e.apiKey && typeof e.apiKey === "string")
-        ? `${e.apiKey}|${e.model}|${e.provider || "unknown"}`
-        : "local-no-key";
+      const masked = maskApiKey(e.apiKey);
+      const apiKeyKey = masked ? `${masked}|${e.model}|${e.provider || "unknown"}` : "local-no-key";
       if (stats.byApiKey[apiKeyKey] && new Date(ts) > new Date(stats.byApiKey[apiKeyKey].lastUsed)) stats.byApiKey[apiKeyKey].lastUsed = ts;
+      touchKeySummary(stats, apiKeyIdentity(e.apiKey, apiKeyMap), ts);
 
       const endpoint = e.endpoint || "Unknown";
       const endpointKey = `${endpoint}|${e.model}|${e.provider || "unknown"}`;
@@ -573,10 +708,11 @@ export async function getUsageStats(period = "all") {
     } else {
       cutoff = new Date(Date.now() - PERIOD_MS["24h"]).toISOString();
     }
-    const filtered = db.all(
-      `SELECT timestamp, provider, model, connectionId, apiKey, endpoint, promptTokens, completionTokens, cost, tokens FROM usageHistory WHERE timestamp >= ?`,
+    let filtered = db.all(
+      `SELECT timestamp, provider, model, connectionId, apiKey, endpoint, promptTokens, completionTokens, cost, tokens, status FROM usageHistory WHERE timestamp >= ?`,
       [cutoff]
     );
+    if (keyFilter) filtered = filtered.filter((r) => keyFilter.has(r.apiKey));
 
     for (const r of filtered) {
       const tokens = parseJson(r.tokens, {}) || {};
@@ -623,25 +759,7 @@ export async function getUsageStats(period = "all") {
         if (new Date(r.timestamp) > new Date(stats.byAccount[accountKey].lastUsed)) stats.byAccount[accountKey].lastUsed = r.timestamp;
       }
 
-      if (r.apiKey && typeof r.apiKey === "string") {
-        const keyInfo = apiKeyMap[r.apiKey];
-        const keyName = keyInfo?.name || r.apiKey.slice(0, 8) + "...";
-        const apiKeyMasked = maskApiKey(r.apiKey);
-        const akKey = `${apiKeyMasked}|${r.model}|${r.provider || "unknown"}`;
-        if (!stats.byApiKey[akKey]) {
-          stats.byApiKey[akKey] = { requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0, rawModel: r.model, provider: providerDisplayName, apiKeyMasked, keyName, apiKeyKey: apiKeyMasked, lastUsed: r.timestamp };
-        }
-        const ake = stats.byApiKey[akKey];
-        ake.requests++; ake.promptTokens += promptTokens; ake.completionTokens += completionTokens; ake.cachedTokens += cachedTokens; ake.cost += entryCost;
-        if (new Date(r.timestamp) > new Date(ake.lastUsed)) ake.lastUsed = r.timestamp;
-      } else {
-        if (!stats.byApiKey["local-no-key"]) {
-          stats.byApiKey["local-no-key"] = { requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0, rawModel: r.model, provider: providerDisplayName, apiKeyMasked: null, keyName: "Local (No API Key)", apiKeyKey: "local-no-key", lastUsed: r.timestamp };
-        }
-        const ake = stats.byApiKey["local-no-key"];
-        ake.requests++; ake.promptTokens += promptTokens; ake.completionTokens += completionTokens; ake.cachedTokens += cachedTokens; ake.cost += entryCost;
-        if (new Date(r.timestamp) > new Date(ake.lastUsed)) ake.lastUsed = r.timestamp;
-      }
+      addApiKeyRow(stats, r, { promptTokens, completionTokens, cachedTokens, entryCost, providerDisplayName, apiKeyMap });
 
       const endpoint = r.endpoint || "Unknown";
       const epKey = `${endpoint}|${r.model}|${r.provider || "unknown"}`;
@@ -654,81 +772,125 @@ export async function getUsageStats(period = "all") {
     }
   }
 
+  // totalRequests is derived from byProvider across every period branch (unchanged
+  // behaviour) — except for the 'all' daily path, where byProvider is built the same
+  // way and the sum still holds. With a key filter both sides are already filtered.
   stats.totalRequests = Object.values(stats.byProvider).reduce((sum, p) => sum + (p.requests || 0), 0);
+  stats.apiKeyFilter = options.apiKey || null;
+  stats.apiKeyFilterUnmatched = !!keyFilter && keyFilter.size === 0;
   return stats;
 }
 
-export async function getChartData(period = "7d") {
+export async function getChartData(period = "7d", options = {}) {
   const db = await getAdapter();
   const now = Date.now();
+  const { apiKey, groupBy } = options;
 
-  if (period === "today") {
-    const bucketCount = 24;
-    const bucketMs = 3600000;
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const startTime = startOfDay.getTime();
-    const endTime = startTime + bucketCount * bucketMs;
-    const labelFn = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-    const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0 }));
+  // One query for the whole window, then bucket in JS. A key filter or a per-key
+  // grouping cannot be read from usageDaily (its sub-maps drop the key), so this
+  // path always reads usageHistory.
+  const [apiKeys, seenKeys] = await Promise.all([
+    import("./apiKeysRepo.js").then((m) => m.getApiKeys()).catch(() => []),
+    getSeenKeyValues(db),
+  ]);
+  const apiKeyMap = {};
+  for (const k of apiKeys) apiKeyMap[k.key] = { name: k.name, id: k.id, hindsightBankId: k.hindsightBankId || null };
+  const keyFilter = apiKey ? resolveKeyFilter(apiKey, apiKeyMap, seenKeys) : null;
 
-    const rows = db.all(
-      `SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ?`,
-      [new Date(startTime).toISOString()]
-    );
-    for (const r of rows) {
-      const t = new Date(r.timestamp).getTime();
-      if (t < startTime || t >= endTime) continue;
-      const idx = Math.floor((t - startTime) / bucketMs);
-      if (idx >= 0 && idx < bucketCount) {
-        buckets[idx].tokens += (r.promptTokens || 0) + (r.completionTokens || 0);
-        buckets[idx].cost += r.cost || 0;
+  const seriesKeyOf = (row) => {
+    const identity = apiKeyIdentity(row.apiKey, apiKeyMap);
+    return { key: apiKeyHandle(identity), label: identity.name, unknown: identity.unknown };
+  };
+  const byApiKey = groupBy === "apiKey";
+
+  // Bucket geometry: today → 24 hourly buckets from midnight; 24h → last 24h;
+  // 7d/30d → one bucket per day (local date, like usageDaily).
+  let buckets;
+  let labelFn;
+  let bucketStart;
+  let bucketMs;
+  let isCalendarDay = false;
+  const labelForTime = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const labelForDay = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  if (period === "today" || period === "24h") {
+    const count = 24;
+    bucketMs = 3600000;
+    if (period === "today") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      bucketStart = start.getTime();
+    } else {
+      bucketStart = now - count * bucketMs;
+    }
+    labelFn = labelForTime;
+    buckets = Array.from({ length: count }, (_, i) => ({ label: labelFn(bucketStart + i * bucketMs), tokens: 0, cost: 0 }));
+  } else {
+    const count = period === "7d" ? 7 : period === "30d" ? 30 : 60;
+    isCalendarDay = true;
+    const today = new Date();
+    buckets = Array.from({ length: count }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (count - 1 - i));
+      return { label: labelForDay(d), dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, tokens: 0, cost: 0 };
+    });
+    const first = new Date(today);
+    first.setDate(first.getDate() - (count - 1));
+    first.setHours(0, 0, 0, 0);
+    bucketStart = first.getTime();
+    bucketMs = 86400000;
+  }
+
+  const rows = db.all(
+    `SELECT timestamp, apiKey, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ?`,
+    [new Date(bucketStart).toISOString()]
+  );
+
+  for (const r of rows) {
+    if (keyFilter && !keyFilter.has(r.apiKey)) continue;
+    const t = new Date(r.timestamp).getTime();
+    let bucket;
+    if (isCalendarDay) {
+      const dateKey = getLocalDateKey(r.timestamp);
+      bucket = buckets.find((b) => b.dateKey === dateKey);
+    } else {
+      const idx = Math.floor((t - bucketStart) / bucketMs);
+      if (idx >= 0 && idx < buckets.length) bucket = buckets[idx];
+    }
+    if (!bucket) continue;
+    const tokens = (r.promptTokens || 0) + (r.completionTokens || 0);
+    const cost = r.cost || 0;
+    bucket.tokens += tokens;
+    bucket.cost += cost;
+    if (byApiKey) {
+      const { key, label, unknown } = seriesKeyOf(r);
+      bucket.series ||= {};
+      const s = bucket.series[key] || (bucket.series[key] = { name: label, unknown, tokens: 0, cost: 0 });
+      s.tokens += tokens;
+      s.cost += cost;
+    }
+  }
+
+  if (!byApiKey) {
+    // Drop the internal dateKey so the existing chart payload shape is untouched.
+    return buckets.map(({ dateKey, ...rest }) => rest);
+  }
+
+  // Flatten per-key series into chart rows: label + one tokens/cost pair per key.
+  const names = {};
+  for (const b of buckets) for (const [key, s] of Object.entries(b.series || {})) names[key] = { name: s.name, unknown: s.unknown };
+  return {
+    groups: Object.entries(names).map(([key, v]) => ({ key, name: v.name, unknown: v.unknown })),
+    rows: buckets.map((b) => {
+      const row = { label: b.label };
+      for (const key of Object.keys(names)) {
+        const s = b.series?.[key];
+        row[`${key}::tokens`] = s ? s.tokens : 0;
+        row[`${key}::cost`] = s ? s.cost : 0;
       }
-    }
-    return buckets;
-  }
-
-  if (period === "24h") {
-    const bucketCount = 24;
-    const bucketMs = 3600000;
-    const labelFn = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-    const startTime = now - bucketCount * bucketMs;
-    const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0 }));
-
-    const rows = db.all(
-      `SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ?`,
-      [new Date(startTime).toISOString()]
-    );
-    for (const r of rows) {
-      const t = new Date(r.timestamp).getTime();
-      if (t < startTime || t > now) continue;
-      const idx = Math.min(Math.floor((t - startTime) / bucketMs), bucketCount - 1);
-      buckets[idx].tokens += (r.promptTokens || 0) + (r.completionTokens || 0);
-      buckets[idx].cost += r.cost || 0;
-    }
-    return buckets;
-  }
-
-  const bucketCount = period === "7d" ? 7 : period === "30d" ? 30 : 60;
-  const today = new Date();
-  const labelFn = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-  // Build map of dateKey → day data
-  const dayRows = loadDaysInRange(db, bucketCount);
-  const dayMap = {};
-  for (const r of dayRows) dayMap[r.dateKey] = parseJson(r.data, {});
-
-  return Array.from({ length: bucketCount }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (bucketCount - 1 - i));
-    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const dayData = dayMap[dateKey];
-    return {
-      label: labelFn(d),
-      tokens: dayData ? (dayData.promptTokens || 0) + (dayData.completionTokens || 0) : 0,
-      cost: dayData ? (dayData.cost || 0) : 0,
-    };
-  });
+      return row;
+    }),
+  };
 }
 
 function formatLogDate(date = new Date()) {
