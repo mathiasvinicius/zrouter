@@ -154,7 +154,7 @@ Deve descrever exatamente os dois modos (já desenhados na Entrega 4) e incluir:
    (índices/constraints) é criado automaticamente no primeiro boot
 
 ⚠️ O README **não pode** conter host, IP, credencial ou caminho do servidor do dono.
-Nada de `<host-remoto>`, `zenith`, `(senha removida)`, `/opt/containers/...`.
+Nada de `<host-remoto>`, `zenith`, `/opt/containers/...`.
 
 ---
 

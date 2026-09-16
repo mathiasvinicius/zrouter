@@ -1,0 +1,194 @@
+# REQUIREMENTS — Entrega 9: seletor de cadernos por API key
+
+**Repo:** `/opt/containers/zrouter` (raiz), código em `./app`
+**Produção:** ZRouter na 20128 (`zrouter.itms.com.br`). **NÃO TOCAR:** 9Router parado, Neo4j de produção.
+
+---
+
+## PROBLEMA (pedido do dono)
+
+> "Quero poder adicionar a cada key um caderno ou vários. Exemplo: key `eve` (todos), key
+> `ArianeMathias` → caderno `ArianeMathias`."
+
+**O backend já funciona.** Verificado:
+
+- `apiKeys.sources` tem o formato `{"open-notebook": {"enabled": bool, "notebooks": [...]}}`
+- `normalizeKeySources` preserva `notebooks` (`apiKeysRepo.js:67`)
+- `openNotebookBackend.js` **filtra de verdade**: `if (!notebooks.some((nb) => allowed.has(String(nb)))) return null`
+- O que a key não tem autorizado **não é retornado**
+
+**O que falta é a UI.** Hoje `SourcesSection.js` renderiza um `ScopeList` com **inputs de texto
+livres** onde o usuário precisa **digitar o ID à mão**:
+
+```
+[ notebook:f0txq4bbh052i8wgdx06    ]  ×
++ Add ids de notebooks
+```
+
+Ninguém sabe esses IDs de cabeça. Precisa virar um **seletor com os cadernos reais**, com opção
+de "todos".
+
+---
+
+## PARTE A — Backend: endpoint para listar cadernos
+
+### A1. Novo endpoint `GET /api/sources/open-notebook/notebooks`
+Cria `src/app/api/sources/open-notebook/notebooks/route.js`:
+
+- Consulta a API do Open Notebook (`OPEN_NOTEBOOK_URL`) com autenticação
+  (`OPEN_NOTEBOOK_PASSWORD`), no endpoint `/api/notebooks`
+- Retorna uma lista **normalizada e mínima** — não repasse a resposta crua:
+  ```json
+  { "notebooks": [ { "id": "notebook:xxx", "name": "ArianeMathias", "description": "..." } ],
+    "count": 4 }
+  ```
+- **Nunca** devolva credencial nem URL interna na resposta
+- **Fail-open:** se o Open Notebook estiver fora, retorne `{notebooks: [], error: "unavailable"}`
+  com HTTP 200 — a UI mostra "não foi possível carregar", não quebra o modal
+- Guarde a chamada com um **cache curto** (ex.: 60s em memória) para não bater no serviço a cada
+  abertura de modal
+
+### A2. Reaproveitar o cliente existente
+Já existe um cliente para o Open Notebook em `open-sse/sources/openNotebookBackend.js` — **leia o
+arquivo** e reuse o mesmo padrão de autenticação/base URL. Não invente um segundo caminho.
+
+---
+
+## PARTE B — UI: seletor de cadernos com "todos"
+
+### B1. Onde
+`src/app/(dashboard)/dashboard/endpoint/components/SourcesSection.js` — o componente que já
+renderiza a seção "Fontes de Conhecimento" nos modais de criação/edição de key.
+
+### B2. Comportamento do escopo `notebooks` — **DECISÃO JÁ TOMADA (não reabra)**
+
+**Verificado por execução real** em `openNotebookBackend.js:47`:
+
+```js
+const allowed = new Set((entry.notebooks || []).map(String));
+if (allowed.size === 0) return [];     // lista vazia = NENHUM resultado
+```
+
+E provado ao vivo:
+```
+notebooks=[]          → 0 resultados
+notebooks=[<id real>] → 3 resultados
+notebooks=["*"]       → 0 resultados   (wildcard não existe hoje)
+```
+
+Ou seja: **lista vazia significa "nenhum", não "todos".** Isso é uma armadilha — quando as
+fontes foram ligadas nas chaves, `notebooks: []` foi gravado e a chave ficou **cega** para o
+Open Notebook sem ninguém perceber.
+
+**Portanto, implemente um marcador explícito de "todos":** use `"*"` e ajuste o backend para
+tratá-lo como "sem restrição":
+
+```js
+const allowed = new Set((entry.notebooks || []).map(String));
+const allowAll = allowed.has("*");
+if (allowed.size === 0) return [];          // continua: nada autorizado = nada retorna
+// ... e no filtro:
+if (!allowAll && !notebooks.some((nb) => allowed.has(String(nb)))) return null;
+```
+
+Mantenha o comportamento atual de `[]` (nada) para não alterar o significado de keys existentes.
+O `"*"` é **aditivo** e explícito.
+
+Aplique o mesmo raciocínio ao `getOpenNotebookSource` (segunda função do arquivo), que tem o
+mesmo filtro.
+
+Então, na UI:
+
+### B3. Preservar compatibilidade
+- Uma key que já tenha `notebooks: ["notebook:abc"]` (ID digitado antes) **deve continuar
+  funcionando** — o seletor precisa marcar aquele item como selecionado, mesmo que o caderno não
+  apareça na lista de carregados (ex.: caderno removido). Renderize-o como item "desconhecido"
+  selecionado, com opção de remover
+- **Não** migre nem limpe valores existentes automaticamente
+
+### B4. Design
+Siga a linguagem que **o próprio arquivo já usa**: `Toggle`, `Button`, classes `brand-500`,
+`surface-2`, `text-muted`, ícones `material-symbols-outlined`. O componente tem 174 linhas e um
+padrão visual definido (herdado do OmniRoute) — **não invente estilo novo**.
+
+---
+
+## PARTE C — Verificação
+
+### C1. Testes
+- `tests/unit/notebook-scope-endpoint.test.js`:
+  - o endpoint normaliza a resposta (só id/name/description)
+  - **não vaza** credencial nem URL interna no payload
+  - Open Notebook fora → `{notebooks: [], error}` com 200, não exceção
+- `tests/unit/notebook-scope-filter.test.js`:
+  - `allowed` vazio → comportamento definido e testado (todos ou nenhum, conforme decisão de B2)
+  - key com `notebooks: ["notebook:a"]` → só fontes do caderno `a` retornam
+  - key com dois cadernos → fontes de ambos retornam
+  - **isso valida o filtro do backend, que já existe** — o teste garante que não regrediu
+
+### C2. Verificação funcional REAL (cole o output)
+O container roda na **20128** e o Open Notebook tem 4+ cadernos reais.
+
+```bash
+# 1. o endpoint lista os cadernos reais?
+curl -s -b <cookie> http://127.0.0.1:20128/api/sources/open-notebook/notebooks | python3 -m json.tool
+# esperado: ArianeMathias, cloudflare, zrouter, Zenith-Server, Base de Conhecimento EVE
+
+# 2. o filtro por caderno funciona ponta a ponta?
+#   - crie/edite uma key com apenas o caderno "zrouter" autorizado
+#   - faça uma busca por um termo que existe em OUTRO caderno
+#   - confirme que o resultado NÃO vem
+#   - libere "todos" e confirme que vem
+```
+Autentique com a senha do dashboard (a mesma do 9Router). **Não invente output.**
+
+### C3. Build
+```bash
+cd app && npm run build   # RC=0
+```
+Não rode `docker compose up -d` — só `restart` se necessário, ou deixe para o EVE.
+
+---
+
+## COMMIT
+
+Um commit único:
+```
+feat(sources): real notebook picker per API key
+
+A key could already be scoped to specific Open Notebook notebooks — the backend
+filters by it and returns null for anything outside the allow-list. But the modal
+asked the user to TYPE the notebook id by hand, which nobody knows by heart.
+
+- GET /api/sources/open-notebook/notebooks: normalized {id,name,description} list,
+  short-lived cache, fail-open (200 with empty list when the service is down).
+  Never echoes a credential or an internal URL.
+- SourcesSection: the open-notebook scope becomes a picker of real notebooks with
+  readable names, an explicit "all notebooks" control, loading and error states,
+  and a preserved-unknown item for ids that no longer exist (no silent cleanup).
+- tests: notebook-scope-endpoint, notebook-scope-filter
+```
+
+---
+
+## O QUE NÃO FAZER
+
+- **NÃO** alterar o formato de `apiKeys.sources` sem migração — keys existentes devem continuar válidas
+- **NÃO** limpar/migrar `notebooks` existentes automaticamente
+- **NÃO** devolver credencial, URL interna ou payload cru do Open Notebook na API
+- **NÃO** criar página nova no dashboard — isto é uma seção do modal de key que já existe
+- **NÃO** inventar estilo: siga o padrão do próprio `SourcesSection.js`
+- **NÃO** tocar no 9Router parado nem no Neo4j de produção
+- **NÃO** rodar `docker compose down` nem apagar dados
+- **NÃO** commitar `.env`, `data/`, `docker-compose.override.yml`, `*.log`
+- **NÃO** fazer push — EVE revisa e publica
+- **NÃO** mexer nos 6 imports mortos de `src/lib/oauth/services/*.js`
+
+## AO FINAL, IMPRIMA
+
+(a) arquivos criados/alterados, uma linha cada
+(b) a DECISÃO sobre "lista vazia = todos ou nenhum", com a evidência do código que a fundamenta
+(c) output REAL do C2, incluindo o teste de filtro ponta a ponta
+(d) saída dos testes e do build
+(e) hash do commit
+(f) o que NÃO conseguiu fazer

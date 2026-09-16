@@ -56,7 +56,7 @@ Tudo que faz o gateway funcionar: **conexões, keys, combos, settings** (exceto 
 | Key **`hindsight-internal`** | **NÃO migrar** | Chave de serviço do Hindsight — não existe no ZRouter. |
 | `memoryBackend: "hindsight"` | **Normalizar para `neo4j`** | A migração 004 já faz isso; aplique no destino. |
 | `settings.globalInstructions` | **NÃO sobrescrever o do ZRouter** | O ZRouter já tem o texto novo (2015 chars) documentando os blocos `ZROUTER_*`. O do 9Router descreve `9ROUTER_*` — importar reverteria o rebranding. **Este é o erro mais fácil de cometer.** |
-| `settings.password` | **Manter o do ZRouter** | O hash bcrypt atual do zrouter foi definido pelo dono (`(senha removida)`). Não trazer o do 9Router. |
+| `settings.password` | **Manter o do ZRouter** | O hash bcrypt atual do zrouter foi definido pelo dono (senha própria do dono — não versionar). Não trazer o do 9Router. |
 | Combos/keys que apontam para combos removidos | **Pular** | Uma key cujo `comboId` não migrou ficaria órfã. Validar integridade antes. |
 
 ### 2.3 Órfãos que a migração precisa resolver
