@@ -1,0 +1,188 @@
+# REQUIREMENTS — Entrega 8: economia de cota (cache policy + saúde de credenciais)
+
+**Repo:** `/opt/containers/zrouter` (raiz), código em `./app`
+**Produção:** ZRouter na 20128 (`zrouter.itms.com.br`). **NÃO TOCAR:** `/opt/containers/9router`
+(parado, rollback) nem o Neo4j de produção (7474).
+**Referência:** `/opt/containers/omniroute-src` (OmniRoute v3.8.51, MIT) — **só leitura**.
+
+---
+
+## ONDE CADA COISA VAI (mapeado — não invente lugar)
+
+Levantei a estrutura antes de decidir. O dashboard **já tem** as casas certas:
+
+| Recurso | Página existente | Por quê |
+|---|---|---|
+| **Política de cache + métricas** | **`/dashboard/token-saver`** | É A página de economia — já contém RTK, Caveman, Ponytail, Headroom, PXPIPE (`TokenSaverClient.js`, 1036 linhas). Cache é a mesma família. |
+| **Saúde de credenciais** | **`/dashboard/providers`** (e por conexão em `providers/[id]`) | É onde as conexões vivem. Um indicador de saúde pertence ao lado do objeto que ele descreve. |
+| Status no dashboard geral | **`/dashboard/quota`** (já é `ProviderLimits`) | Se precisar de um resumo, use o que existe — **não crie página nova**. |
+
+**PROIBIDO criar página nova no sidebar.** As três páginas já existem. Adicione **seções** dentro
+delas, na linguagem visual que elas já usam (`<Card>`, `<h2 className="text-lg font-semibold">`,
+tokens `brand-*`, dark/light).
+
+---
+
+## PARTE A — Política de cache no Token Saver
+
+### A1. O problema (do próprio código do OmniRoute)
+`cacheControlPolicy.ts` (430 linhas) documenta:
+> *"reescrever os marcadores de um cliente cache-aware produzia posições de breakpoint por
+> requisição que destruíam o prompt cache do provider"*
+
+Ou seja: quando o cliente (Claude Code, Cursor) manda `cache_control` bem posicionado e o gateway
+reescreve, o provider **invalida o cache** e você paga tokens de input cheios. Preservar é
+**nunca pior**.
+
+### A2. Estado do ZRouter (verificado)
+- `open-sse/translator/formats/claude.js` já manipula `cache_control` (conta blocos, remove
+  marcadores em bare-object, trata `defer_loading`)
+- `open-sse/rtk/systemInject.js:228` procura o último `cache_control` mas **não decide nada** com ele
+- **Não há política** (`alwaysPreserveClientCache`) nem **métricas**
+
+### A3. O que implementar
+1. **Política** — um modo `auto | always | never`, persistido em settings, decidindo quando
+   preservar os marcadores do cliente. Porte a lógica de `cacheControlPolicy.ts` (leia o arquivo
+   inteiro), adaptando ao translator do fork. **Não copie o arquivo inteiro** — porte o que se
+   aplica; o OmniRoute tem tipos e imports que não existem aqui.
+2. **Respeite o teto de 4 marcadores** do Anthropic — o 9Router tem um fix recente sobre isso
+   ("cap re-anchored cache_control at the 4-marker budget"). Não regrida essa proteção.
+3. **Métricas** — contadores por requisição: `totalInputTokens`, `totalCachedTokens`,
+   `cacheCreationTokens`, e derivados `tokensSaved` / `estimatedCostSaved`. Persista de forma
+   que sobreviva ao restart (o padrão do fork é `usageHistory` no SQLite) e seja consultável por
+   período, **como o resto do uso já é**.
+
+### A4. Onde na UI (dentro de `/dashboard/token-saver`)
+- Um `<Card>` novo, **depois** do card do RTK (`<Card id="rtk">` na linha 478) — mesma hierarquia
+- Conteúdo: toggle do modo de cache (`auto/always/never`) com texto curto explicando o ganho,
+  e um bloco de **métricas de economia** ("tokens economizados", "economia estimada")
+- **Reuse** o padrão de toggle que a página já usa (`<Toggle>`), não invente componente
+- Siga o `<h2 className="text-lg font-semibold flex items-center gap-2">` existente
+
+---
+
+## PARTE B — Saúde de credenciais
+
+### B1. O que é (OmniRoute: `src/lib/credentialHealth/`)
+Scheduler em background que testa as conexões periodicamente:
+- delay inicial 30s após boot, intervalo default **5 min** (configurável)
+- **backoff exponencial** no erro: 5min → 10min → 30min → máx 2h; **reset no sucesso**
+- override por conexão (`healthCheckInterval`, 0 = nunca testar)
+- reaproveita o `testSingleConnection()` existente (todos os validadores prontos)
+
+### B2. Por que importa aqui (caso real de hoje)
+As 18 conexões migradas vieram com **`testStatus: unavailable`, `errorCode: 502` e
+`modelLock_*` congelados** — estado herdado que **travava** as conexões. Foi preciso limpar à mão.
+Um scheduler desses detecta e recupera sozinho.
+
+### B3. O que implementar
+1. **Scheduler** análogo, reusando o testador que o fork **já tem**
+   (`src/app/api/providers/[id]/test` → `testSingleConnection`). **Não escreva validador novo.**
+2. Persistir o resultado por conexão num campo de saúde (o fork já guarda `testStatus` dentro do
+   JSON `data` da conexão — **use o campo existente**, não crie tabela nova).
+3. Backoff com teto, reset no sucesso, intervalo configurável por env
+   (`CREDENTIAL_HEALTH_CHECK_INTERVAL`, default 5 min) e por conexão.
+4. **Limpar junto o estado obsoleto** ao revalidar com sucesso: `modelLock_*`, `backoffLevel`,
+   `rateLimitedUntil`, `errorCode`, `lastError`. É o que o 9Router faz
+   ("clear stale connection health state when a connection is re-validated").
+5. **Não bloquear o boot** — delay inicial e falha silenciosa; o gateway sobe mesmo com Neo4j ou
+   provider fora (o mesmo princípio do `ensureNeo4jSchema`).
+6. **Nada de teste agressivo**: não pingar provider pago a cada minuto. Respeite o intervalo e o
+   backoff. Log estruturado, sem credencial.
+
+### B4. Onde na UI
+- **`/dashboard/providers`**: um indicador de saúde por conexão (ponto verde/amarelo/vermelho,
+  com último teste e próximo), na linha que já existe (`ConnectionRow.js`)
+- **`providers/[id]`**: o detalhe da conexão mostra último teste, erro e o botão de testar
+  manualmente (já existe o teste — só exiba o histórico)
+- **NÃO** crie aba nem página. É atributo da conexão.
+
+---
+
+## PARTE C — Testes e verificação
+
+### C1. Testes
+- `tests/unit/cache-policy.test.js`:
+  - modo `never` reescreve; `always` preserva; `auto` preserva quando o cliente é cache-aware
+  - o teto de 4 marcadores nunca é ultrapassado (asserção explícita)
+  - métricas somam corretamente de fixtures
+- `tests/unit/credential-health.test.js`:
+  - backoff cresce 5→10→30→máx e reseta no sucesso
+  - intervalo 0 na conexão = não testar
+  - revalidação com sucesso **limpa** `modelLock_*`/`errorCode`/`backoffLevel`
+  - falha do testador não derruba o scheduler (fail-open)
+
+### C2. Verificação funcional REAL (cole o output)
+O container roda na **20128** com 152+ requisições no histórico de hoje.
+
+```bash
+# cache: a política está aplicada?
+curl -s 'http://127.0.0.1:20128/api/settings' | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('cacheControlMode'))"
+# métricas de economia
+curl -s 'http://127.0.0.1:20128/api/usage/stats?period=24h' | python3 -m json.tool | head -30
+# saúde: uma conexão deve reportar estado e último teste
+curl -s 'http://127.0.0.1:20128/api/providers' | python3 -c "import json,sys; cs=json.load(sys.stdin)['connections']; print([(c['provider'], json.loads(c.get('data','{}')).get('testStatus')) for c in cs[:5]])"
+```
+E prove o comportamento, não só a leitura:
+- **cache**: mande uma requisição com `cache_control` bem posicionado e mostre que ele sobrevive
+  até o upstream (log/inspeção) no modo `always`, e que é reescrito no `never`
+- **saúde**: force um erro numa conexão (ou use uma que já esteja com `testStatus: unavailable`)
+  e mostre o scheduler detectando + recuperando, com o campo de saúde mudando
+
+Se não conseguir montar algum cenário, **diga onde travou — não invente**.
+
+### C3. Build
+```bash
+cd app && npm run build     # RC=0
+```
+
+---
+
+## COMMIT
+
+Um commit único:
+```
+feat(saver): prompt-cache policy with savings metrics, plus credential health checks
+
+Two OmniRoute features ported where they actually belong in this dashboard.
+
+Cache: rewriting a cache-aware client's cache_control markers produced per-request
+breakpoint positions that thrashed the provider prompt cache. Added an
+auto|always|never policy (ported from cacheControlPolicy, not copied wholesale),
+respecting the 4-marker Anthropic budget, plus tokensSaved/estimatedCostSaved
+metrics. Lives in /dashboard/token-saver, next to RTK/Caveman/Ponytail — the page
+that already exists for exactly this.
+
+Credential health: a background scheduler reusing the existing
+testSingleConnection(), with exponential backoff (5min->2h) and reset on success.
+It also clears the stale health state (modelLock_*, errorCode, backoffLevel,
+rateLimitedUntil) that a successful re-validation invalidates — the exact class of
+frozen state that had to be cleaned by hand after the 9Router migration. Surfaced
+as a health indicator on the existing connection row, not a new page.
+
+- no new sidebar entry: both features extend pages that already exist
+- tests: cache-policy, credential-health
+```
+
+---
+
+## O QUE NÃO FAZER
+
+- **NÃO** criar página nova no sidebar — as casas já existem (token-saver, providers)
+- **NÃO** copiar `cacheControlPolicy.ts` inteiro: porte a lógica, adapte aos imports do fork
+- **NÃO** quebrar a proteção do teto de 4 marcadores do Anthropic
+- **NÃO** testar provider pago agressivamente — respeite intervalo e backoff
+- **NÃO** criar tabela nova de saúde: use o campo existente no JSON da conexão
+- **NÃO** tocar no 9Router parado, no Neo4j de produção, nem no `usageHistory` (esquema)
+- **NÃO** bloquear o boot com o scheduler
+- **NÃO** commitar `.env`, `data/`, `docker-compose.override.yml`, `*.log`
+- **NÃO** fazer push — EVE revisa e publica
+- **NÃO** mexer nos 6 imports mortos de `src/lib/oauth/services/*.js`
+
+## AO FINAL, IMPRIMA
+
+(a) arquivos criados/alterados, uma linha cada, com a PÁGINA onde cada um aparece
+(b) output REAL das verificações C2, incluindo a prova de comportamento (não só leitura)
+(c) saída dos testes e do build
+(d) hash do commit
+(e) o que NÃO conseguiu fazer

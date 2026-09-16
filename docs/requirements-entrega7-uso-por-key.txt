@@ -1,0 +1,171 @@
+# REQUIREMENTS — Entrega 7: Histórico de uso por API key
+
+**Repo:** `/opt/containers/zrouter` (raiz), código em `./app`
+**Produção agora:** ZRouter na porta **20128** (`zrouter.itms.com.br`). O 9Router antigo está
+parado como rollback.
+**NÃO TOCAR:** `/opt/containers/9router`, Neo4j de produção (7474).
+
+---
+
+## OBJETIVO (pedido do dono)
+
+> "Quero histórico de uso por api key. Pra poder identificar facilmente as origens de uso."
+
+Hoje o dashboard mostra uso **por provider**. O dono quer saber **qual chave** consumiu o quê —
+para identificar de onde vem o uso (qual agente, qual cliente, qual perfil).
+
+## O DADO JÁ EXISTE — falta a superfície
+
+Verificado:
+
+- `usageHistory.apiKey` **já é gravado** em cada requisição (149 linhas, ex. `sk-b910f70de...`)
+- A tabela tem: `id, timestamp, provider, model, connectionId, apiKey, endpoint, promptTokens,
+  completionTokens, cost, status, tokens, meta`
+- `getUsageStats(period)` retorna `byProvider` — **e só isso**
+- `grep -rn 'apiKey' app/src/app/(dashboard)/dashboard/usage/` → **vazio**: a UI nunca mostra
+
+Ou seja: **não há migração nem coleta a fazer. É trabalho de agregação + UI.**
+
+---
+
+## PARTE A — API: agregação por chave
+
+### A1. Estender `/api/usage/stats`
+Em `src/app/api/usage/stats/route.js` → `getUsageStats(period)` (em `src/lib/usageDb`):
+
+Adicione `byApiKey` ao retorno, no mesmo formato de `byProvider`:
+
+```js
+byApiKey: {
+  "<key-fingerprint-ou-id>": { requests, promptTokens, completionTokens, cost, ... }
+}
+```
+
+**Decisão de privacidade (importante):** a chave completa (`sk-...`) **não** deve trafegar para
+a UI. Mapeie para um identificador estável e legível:
+- prefira o **nome** da chave (`eve`, `OCR`, `ViniciusMathias`) resolvido via `apiKeys`
+- se a chave não existir mais (deletada), use um rótulo `desconhecida-<hash curto>`
+- nunca devolva a chave inteira; um prefixo (`sk-b91…`) é aceitável como secundário
+
+Implemente uma resolução `apiKey → { id, name }` numa query só (join/Map), não N+1.
+
+### A2. Filtro por chave
+Aceite `apiKey` (nome ou id) como parâmetro opcional em `/api/usage/stats` e nos endpoints que
+já filtram por período (`/api/usage/chart`, `/api/usage/history`). Com filtro, `totalRequests`,
+`byProvider` e os totais refletem **apenas aquela chave**.
+
+### A3. Série temporal por chave
+Em `/api/usage/chart`, permita `groupBy=apiKey` além do agrupamento atual, para o gráfico poder
+mostrar uma linha por chave.
+
+---
+
+## PARTE B — UI: a página de uso
+
+### B1. Card/tabela "Uso por API key"
+Na página `/dashboard/usage` (`src/app/(dashboard)/dashboard/usage/page.js` + `components/`):
+
+Nova seção com uma linha por chave, ordenável, mostrando:
+- **nome da chave** (e o perfil/banco associado, se houver — `hindsightBankId`)
+- requisições, tokens (prompt/completion), **custo**
+- último uso (timestamp)
+- participação no total (barra ou %)
+
+Siga o design system existente (`Card`, `SegmentedControl`, tokens de tema `brand-*`,
+dark/light). **Não invente estilo novo** — copie a linguagem visual de `OverviewCards.js` e
+`UsageTable.js`, que já existem na mesma pasta.
+
+### B2. Filtro por chave na página
+Um seletor (ex.: `SegmentedControl` ou dropdown) que filtra a página inteira por chave,
+refletindo na URL (`?apiKey=...`) para ser compartilhável/recarregável — o componente já usa
+`useSearchParams`/`useRouter`, siga esse padrão.
+
+### B3. Ligação com a chave
+Quando a linha corresponder a uma chave existente, torne-a clicável levando ao endpoint/perfil
+dela (`/dashboard/endpoint` com a chave selecionada), fechando o ciclo "vejo o uso → vou na chave".
+
+### B4. Onde a chave "não existe mais"
+Uso de chaves deletadas continua aparecendo (histórico é histórico), agrupado sob o rótulo de
+desconhecida. Deixe visualmente distinto (ex.: texto muted).
+
+---
+
+## PARTE C — Testes e verificação
+
+### C1. Testes
+- `tests/unit/usage-by-api-key.test.js`:
+  - `byApiKey` agrega corretamente (monte fixtures: 2 chaves, N requisições, verifique somas)
+  - a chave completa **nunca** aparece no payload (asserção explícita de que não há `sk-` longo)
+  - chave deletada cai no rótulo de desconhecida
+  - filtro `apiKey` restringe os totais
+  - chave sem uso não aparece (ou aparece zerada — escolha e documente)
+
+### C2. Verificação funcional REAL
+O container roda na **20128** e já tem 152 requisições no `usageHistory` de hoje.
+
+```bash
+# por chave
+curl -s 'http://127.0.0.1:20128/api/usage/stats?period=24h' | python3 -m json.tool | head -40
+# com filtro
+curl -s 'http://127.0.0.1:20128/api/usage/stats?period=24h&apiKey=eve' | python3 -m json.tool
+```
+Cole o output real. Confirme que:
+- `byApiKey` aparece com nomes legíveis (não `sk-...`)
+- a soma de `byApiKey` bate com `totalRequests`
+- o filtro reduz os números
+
+Depois, gere tráfego de uma chave específica e mostre o contador dela subindo:
+```bash
+# gere 2 requisições com a chave X, então consulte de novo e compare
+```
+
+### C3. Build e página
+```bash
+cd app && npm run build     # RC=0
+curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:20128/dashboard/usage
+```
+Não rode `docker compose up -d` — só `restart` se precisar, ou deixe para o EVE aplicar.
+
+---
+
+## COMMIT
+
+Um commit único:
+```
+feat(usage): per-API-key usage history and filtering
+
+The owner needs to see where usage comes from, not just which provider served it.
+The data was already there — usageHistory.apiKey is written on every request — but
+getUsageStats only aggregated by provider and the UI never looked at the key.
+
+- getUsageStats: new byApiKey aggregate; the full key never reaches the client
+  (resolved to the key's name, or a "unknown-<hash>" label for deleted keys)
+- /api/usage/stats + /chart + /history accept an apiKey filter; /chart accepts
+  groupBy=apiKey for one series per key
+- /dashboard/usage: "Usage by API key" section (requests, tokens, cost, last use,
+  share of total), a key filter reflected in the URL, and a link from each row to
+  that key's endpoint page
+- tests: usage-by-api-key
+```
+
+---
+
+## O QUE NÃO FAZER
+
+- **NÃO** devolver a chave completa (`sk-...`) em nenhuma resposta de API ou tela
+- **NÃO** tocar no 9Router parado nem no Neo4j de produção
+- **NÃO** alterar o esquema de `usageHistory` (o dado já está lá; não precisa de migração)
+- **NÃO** migrar o histórico do 9Router — o dono decidiu que não é necessário agora
+- **NÃO** quebrar a UI existente de uso por provider: a visão atual continua funcionando
+- **NÃO** rodar `docker compose down`, apagar volume ou dado
+- **NÃO** commitar `.env`, `data/`, `docker-compose.override.yml`, `*.log`
+- **NÃO** fazer push — EVE revisa e publica
+- **NÃO** mexer nos 6 imports mortos de `src/lib/oauth/services/*.js`
+
+## AO FINAL, IMPRIMA
+
+(a) arquivos alterados/criados, uma linha cada
+(b) output REAL dos curls da Parte C2, incluindo antes/depois do tráfego gerado
+(c) saída dos testes e do build
+(d) hash do commit
+(e) o que NÃO conseguiu fazer
