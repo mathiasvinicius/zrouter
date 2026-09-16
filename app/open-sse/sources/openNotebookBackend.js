@@ -5,7 +5,12 @@
 // 10s timeout; errors → empty list + structured log without credentials.
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:5055";
-const SEARCH_TIMEOUT_MS = 10_000;
+// The Open Notebook /api/search runs an embedding + vector query; a cold search
+// measured 48.5s on this deployment (first call after idle). 10s aborted every
+// real search. Keep a generous ceiling — the caller (sources/context.js) imposes
+// its own sourcesRecallTimeoutMs budget and fails open, so a slow source never
+// blocks inference; this only bounds the individual HTTP call.
+const SEARCH_TIMEOUT_MS = 90_000;
 
 function baseUrl() {
   return String(process.env.OPEN_NOTEBOOK_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");

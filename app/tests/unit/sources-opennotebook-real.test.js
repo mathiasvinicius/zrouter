@@ -1,5 +1,9 @@
 // Real read from Open Notebook (127.0.0.1:5055) through the backend — proves
 // the authorized-notebook filter works against the actual server data.
+//
+// TIMEOUT NOTE: the first /api/search against a cold Open Notebook takes ~50s
+// (embedding + vector search). The per-test budget is 90s for that reason —
+// a 20s budget produced flaky failures that were NOT regressions.
 import { describe, expect, it } from "vitest";
 
 const { searchOpenNotebook, getOpenNotebookSource } = await import("open-sse/sources/openNotebookBackend.js");
@@ -17,12 +21,12 @@ describe("open-notebook backend (real server)", () => {
     expect(results[0].bank).toBe(AUTHORIZED[0]);
     expect(results[0].score).toBeGreaterThan(0);
     expect(results[0].sourceId.startsWith("open-notebook:")).toBe(true);
-  }, 20_000);
+  }, 90_000);
 
   (real ? it : it.skip)("returns empty for a key whose notebooks are not authorized", async () => {
     const results = await searchOpenNotebook("Zenith servidor 9Router", { enabled: true, notebooks: UNAUTHORIZED }, 10);
     expect(results).toEqual([]);
-  }, 20_000);
+  }, 90_000);
 
   (real ? it : it.skip)("getSource returns full content only inside the authorized scope", async () => {
     const results = await searchOpenNotebook("Zenith", { enabled: true, notebooks: AUTHORIZED }, 1);
