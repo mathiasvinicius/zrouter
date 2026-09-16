@@ -78,6 +78,9 @@ const DEFAULT_SETTINGS = {
   mitmRouterBaseUrl: DEFAULT_MITM_ROUTER_BASE,
   dnsToolEnabled: {},
   rtkEnabled: true,
+  // Entrega 8 — prompt-cache policy: auto (cache-aware client + caching provider) |
+  // always | never. See open-sse/utils/cacheControlPolicy.js.
+  cacheControlMode: "auto",
   // Entrega 3 — per-key sources recall (chat path) and its injection caps.
   sourcesRecallLimit: 6,
   sourcesRecallTimeoutMs: 2500,

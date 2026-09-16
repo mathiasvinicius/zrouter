@@ -61,7 +61,7 @@ function normalizeMessageContent(msg) {
 
 // Total blocks carrying cache_control across system, tools, and messages — the
 // upstream Messages API allows at most 4 markers per request.
-function countCacheControlBlocks(body) {
+export function countCacheControlBlocks(body) {
   let n = 0;
   if (Array.isArray(body?.system)) for (const b of body.system) if (b?.cache_control) n++;
   if (Array.isArray(body?.tools)) for (const t of body.tools) if (t?.cache_control) n++;
@@ -79,7 +79,7 @@ function countCacheControlBlocks(body) {
 // of the other markers in document order. A plain "keep the last 4 in document
 // order" rule would drop the head anchors first — they lead document order, yet
 // they are exactly what re-anchoring exists to pin.
-function capCacheControlBlocks(body) {
+export function capCacheControlBlocks(body) {
   const isHead = (b) => {
     const sys = Array.isArray(body?.system) ? body.system : [];
     if (sys.length && sys[sys.length - 1] === b) return true;
@@ -340,7 +340,11 @@ function markLastCacheableBlock(msg) {
 // The client's own markers point at pre-normalization offsets, so they are dropped.
 // Must run LAST, after every step that can reshape system/tools/messages
 // (normalize, tool dedupe, token savers) — otherwise the anchor drifts off the tail.
-export function anchorClaudeCache(body) {
+//
+// `preserve` (cacheControlPolicy.shouldPreserveCacheControl) keeps the client's
+// own breakpoints instead: they advance deterministically turn-over-turn, so
+// re-deriving them per request is what thrashed the provider prompt cache.
+export function anchorClaudeCache(body, preserve = false) {
   if (!body || typeof body !== "object") return body;
   if (Array.isArray(body.messages)) {
     for (const msg of body.messages) normalizeMessageContent(msg);
@@ -353,6 +357,13 @@ export function anchorClaudeCache(body) {
     for (const t of body.tools) {
       if (t?.defer_loading === true) delete t.cache_control;
     }
+  }
+
+  // Preservation mode: the client's markers survive verbatim — only the two
+  // hard invariants are enforced (no marker on a deferred tool, <= 4 markers).
+  if (preserve) {
+    if (countCacheControlBlocks(body) > 4) capCacheControlBlocks(body);
+    return body;
   }
 
   // Head anchors first, before any budget guard: the 1h TTL on system/tools is
@@ -415,7 +426,12 @@ export function anchorClaudeCache(body) {
 // - Add thinking block for Anthropic endpoint (provider === "claude")
 // - Fix tool_use/tool_result ordering
 // - Apply cloaking (billing header + fake user ID) for OAuth tokens
-export function prepareClaudeRequest(body, provider = null, apiKey = null, connectionId = null, rawHeaders = null, sessionId = null) {
+// `preserveCacheControl` keeps the client's own cache_control breakpoints instead of
+// re-deriving them (see cacheControlPolicy.js): the re-derived positions were not
+// stable turn-over-turn, which thrashed the provider prompt cache. Invariants that
+// Anthropic enforces are still applied at the end (no marker on a deferred tool,
+// at most 4 markers).
+export function prepareClaudeRequest(body, provider = null, apiKey = null, connectionId = null, rawHeaders = null, sessionId = null, preserveCacheControl = false) {
   // quirk: MiniMax's Claude-compatible endpoint rejects Anthropic's output_config (400 invalid params)
   if (PROVIDERS[provider]?.quirks?.dropOutputConfig) {
     delete body.output_config;
@@ -444,8 +460,9 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
     }
   }
 
-  // 1. System: remove all cache_control, add only to last block with ttl 1h
-  if (body.system && Array.isArray(body.system)) {
+  // 1. System: remove all cache_control, add only to last block with ttl 1h.
+  // Preserve mode keeps the client's own breakpoints where they are.
+  if (!preserveCacheControl && body.system && Array.isArray(body.system)) {
     body.system = body.system.map((block, i) => {
       const { cache_control, ...rest } = block;
       if (i === body.system.length - 1) {
@@ -465,8 +482,8 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
       const msg = body.messages[i];
       normalizeMessageContent(msg);
 
-      // Remove cache_control from content blocks
-      if (Array.isArray(msg.content)) {
+      // Remove cache_control from content blocks (preserve mode: client's markers stay)
+      if (!preserveCacheControl && Array.isArray(msg.content)) {
         for (const block of msg.content) {
           delete block.cache_control;
         }
@@ -498,7 +515,7 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
       if (msg.role === "assistant" && Array.isArray(msg.content)) {
         // Add cache_control to last non-thinking block of first (from end) assistant with content
         // thinking/redacted_thinking blocks do not support cache_control
-        if (!lastAssistantProcessed && msg.content.length > 0) {
+        if (!preserveCacheControl && !lastAssistantProcessed && msg.content.length > 0) {
           for (let j = msg.content.length - 1; j >= 0; j--) {
             const block = msg.content[j];
             if (block.type !== CLAUDE_BLOCK.THINKING && block.type !== CLAUDE_BLOCK.REDACTED_THINKING) {
@@ -592,20 +609,33 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
         });
     }
 
-    const lastCacheable = lastCacheableToolIndex(body.tools);
-    body.tools = body.tools.map((tool, i) => {
-      const { cache_control, ...rest } = tool;
-      if (i === lastCacheable) {
-        return { ...rest, cache_control: { type: "ephemeral", ttl: "1h" } };
-      }
-      return rest;
-    });
+    if (!preserveCacheControl) {
+      const lastCacheable = lastCacheableToolIndex(body.tools);
+      body.tools = body.tools.map((tool, i) => {
+        const { cache_control, ...rest } = tool;
+        if (i === lastCacheable) {
+          return { ...rest, cache_control: { type: "ephemeral", ttl: "1h" } };
+        }
+        return rest;
+      });
+    }
 
     // Remove tools array and tool_choice if empty after filtering
     if (body.tools.length === 0) {
       delete body.tools;
       delete body.tool_choice;
     }
+  }
+
+  // Preserved markers still respect the two hard Anthropic invariants: a deferred
+  // tool must not carry cache_control (#3567), and at most 4 markers per request.
+  if (preserveCacheControl) {
+    if (Array.isArray(body.tools)) {
+      for (const t of body.tools) {
+        if (t?.defer_loading === true) delete t.cache_control;
+      }
+    }
+    if (countCacheControlBlocks(body) > 4) capCacheControlBlocks(body);
   }
 
   // Apply cloaking for OAuth tokens (billing header + fake user ID)

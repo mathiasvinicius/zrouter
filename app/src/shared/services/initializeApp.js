@@ -113,6 +113,13 @@ async function runHeavyStartup() {
       .catch((e) => console.log("[AutoPing] scheduler start failed:", e.message));
   }
 
+  // Credential health scheduler (Entrega 8). Deferred and fail-open: the gateway
+  // must boot even when every provider is unreachable (same principle as
+  // ensureNeo4jSchema). It reuses the existing testSingleConnection().
+  import("@/lib/credentialHealth/scheduler.js")
+    .then(({ startCredentialHealthScheduler }) => startCredentialHealthScheduler())
+    .catch((e) => console.log("[CredentialHealth] scheduler start failed:", e.message));
+
   // Proactive OAuth token refresh (e.g. grok-cli ~6h TTL). Module is idempotent
   // and also started from custom-server.js when that entry is used.
   import("@/sse/services/backgroundTokenRefresh.js")

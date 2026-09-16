@@ -10,6 +10,12 @@ import {
   PONYTAIL_LEVELS,
 } from "../endpoint/endpointConstants";
 
+const CACHE_MODES = [
+  { id: "auto", label: "Auto", desc: "Preserve only for cache-aware clients on caching providers" },
+  { id: "always", label: "Always", desc: "Always keep the client's cache_control breakpoints" },
+  { id: "never", label: "Never", desc: "Let ZRouter re-anchor the breakpoints itself" },
+];
+
 export default function TokenSaverClient() {
   const [rtkEnabled, setRtkEnabledState] = useState(true);
   const [headroomEnabled, setHeadroomEnabled] = useState(false);
@@ -58,6 +64,8 @@ export default function TokenSaverClient() {
   const [showPxpipeModal, setShowPxpipeModal] = useState(false);
   const [pxpipeActionLoading, setPxpipeActionLoading] = useState(false);
   const [pxpipeActionError, setPxpipeActionError] = useState("");
+  const [cacheMode, setCacheMode] = useState("auto");
+  const [cacheMetrics, setCacheMetrics] = useState(null);
   const [locale, setLocale] = useState("en");
 
   const { copied, copy } = useCopyToClipboard();
@@ -396,6 +404,19 @@ export default function TokenSaverClient() {
     [refreshPxpipeStatus, runPxpipeHealth]
   );
 
+  const loadCacheMetrics = useCallback(async () => {
+    try {
+      const res = await fetch("/api/usage/cache-metrics?period=24h");
+      if (res.ok) setCacheMetrics(await res.json());
+    } catch {}
+  }, []);
+
+  const handleCacheMode = (mode) => {
+    setCacheMode(mode);
+    patchSetting({ cacheControlMode: mode });
+    loadCacheMetrics();
+  };
+
   const handlePxpipeEnabled = (value) => {
     setPxpipeEnabled(value);
     patchSetting({ pxpipeEnabled: value });
@@ -432,14 +453,16 @@ export default function TokenSaverClient() {
           setPonytailLevel(data.ponytailLevel || "full");
           setPxpipeEnabled(!!data.pxpipeEnabled);
           if (typeof data.pxpipeMinChars === "number") setPxpipeMinChars(data.pxpipeMinChars);
+          setCacheMode(data.cacheControlMode || "auto");
           refreshHeadroomStatus();
           // PRD: run the PXPIPE health check automatically when the page opens
           refreshPxpipeStatus().then(runPxpipeHealth);
+          loadCacheMetrics();
         }
       } catch {}
     };
     loadSettings();
-  }, [refreshHeadroomStatus, refreshPxpipeStatus, runPxpipeHealth]);
+  }, [refreshHeadroomStatus, refreshPxpipeStatus, runPxpipeHealth, loadCacheMetrics]);
 
   const headroomRunning = !!headroomStatus.running;
   const headroomStatusLabel = headroomStatus.loading
@@ -787,6 +810,66 @@ export default function TokenSaverClient() {
           />
         </div>
         )}
+      </Card>
+
+      <Card id="cache-policy">
+        <div className="mb-2">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">database</span>
+            Prompt cache
+          </h2>
+          <p className="text-sm text-text-muted mt-1">
+            Keep the client&apos;s own cache_control breakpoints instead of re-deriving
+            them per request. Re-derived breakpoints move every turn and invalidate the
+            provider prompt cache, so cached input gets re-billed at full price.
+          </p>
+        </div>
+        <div className="flex items-center justify-between pt-2 gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Preservation mode</p>
+            <p className="text-sm text-text-muted">
+              auto: preserve for cache-aware clients (Claude Code) on caching providers ·
+              always · never
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {CACHE_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => handleCacheMode(mode.id)}
+                className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                  cacheMode === mode.id
+                    ? "bg-primary text-white border-primary"
+                    : "bg-transparent border-border text-text-muted hover:bg-surface-2"
+                }`}
+                title={mode.desc}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-4 mt-4 border-t border-border sm:grid-cols-4">
+          <div>
+            <p className="text-xs text-text-muted">Tokens saved (24h)</p>
+            <p className="text-lg font-semibold">{(cacheMetrics?.tokensSaved ?? 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-text-muted">Estimated savings (24h)</p>
+            <p className="text-lg font-semibold">${(cacheMetrics?.estimatedCostSaved ?? 0).toFixed(4)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-text-muted">Cache creation tokens</p>
+            <p className="text-lg font-semibold">{(cacheMetrics?.cacheCreationTokens ?? 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-text-muted">Requests preserving markers</p>
+            <p className="text-lg font-semibold">
+              {(cacheMetrics?.preservedRequests ?? 0).toLocaleString()}
+              <span className="text-xs font-normal text-text-muted"> / {(cacheMetrics?.requests ?? 0).toLocaleString()}</span>
+            </p>
+          </div>
+        </div>
       </Card>
 
       <Modal

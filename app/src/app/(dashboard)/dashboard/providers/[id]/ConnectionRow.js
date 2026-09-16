@@ -5,6 +5,7 @@ import { getStatusVariant as getConnectionStatusVariant } from "@/shared/utils/c
 import PropTypes from "prop-types";
 import { Badge, Toggle, Tooltip } from "@/shared/components";
 import CooldownTimer from "./CooldownTimer";
+import { getRelativeTime } from "@/shared/utils";
 
 export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst, isLast, onMoveUp, onMoveDown, onToggleActive, onUpdateProxy, onEdit, onDelete, oneByOneStatus = null, autoPing = null }) {
   const [showProxyDropdown, setShowProxyDropdown] = useState(false);
@@ -118,6 +119,26 @@ export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst
 
   const getStatusVariant = () => getConnectionStatusVariant(connection.isActive, effectiveStatus);
 
+  // Credential-health indicator: green = last check passed, amber = never checked
+  // by the scheduler yet, red = last check failed. The scheduler owns the writes;
+  // this only renders what it persisted (testStatus/lastTested/lastError).
+  const health = connection.health || null;
+  const healthStatus = health?.status || effectiveStatus || "unknown";
+  const healthDotClass = healthStatus === "active"
+    ? "bg-success"
+    : healthStatus === "error" || healthStatus === "expired" || healthStatus === "unavailable"
+      ? "bg-error"
+      : "bg-warning";
+  const healthLabel = health?.lastTestedAt || connection.lastTested
+    ? `checked ${getRelativeTime(health?.lastTestedAt || connection.lastTested)}`
+    : "not checked yet";
+  // getRelativeTime only renders the past; a next-check stamp is in the future.
+  const healthNextMs = health?.nextCheckAt ? new Date(health.nextCheckAt).getTime() - Date.now() : 0;
+  const healthNextLabel = healthNextMs > 0
+    ? ` · next in ${Math.ceil(healthNextMs / 60000)}m`
+    : "";
+  const healthTooltip = `Credential health: ${healthStatus}${health?.consecutiveFailures ? ` (${health.consecutiveFailures} consecutive failures)` : ""}\n${healthLabel}${healthNextLabel}${health?.lastError ? `\n${health.lastError}` : ""}`;
+
   const getOneByOneVariant = () => {
     if (!oneByOneStatus) return "default";
     if (oneByOneStatus.state === "success") return "success";
@@ -176,6 +197,14 @@ export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst
               </Badge>
             )}
             {isCooldown && connection.isActive !== false && <CooldownTimer until={modelLockUntil} />}
+            {connection.isActive !== false && (
+              <Tooltip text={healthTooltip}>
+                <span className="flex items-center gap-1 text-xs text-text-muted">
+                  <span className={`inline-block size-2 rounded-full ${healthDotClass}`} />
+                  {healthLabel}
+                </span>
+              </Tooltip>
+            )}
             {connection.lastError && connection.isActive !== false && (
               <span className="max-w-full truncate text-xs text-red-500 sm:max-w-[300px]" title={connection.lastError}>
                 {connection.lastError}
@@ -285,6 +314,13 @@ ConnectionRow.propTypes = {
     displayName: PropTypes.string,
     modelLockUntil: PropTypes.string,
     testStatus: PropTypes.string,
+    health: PropTypes.shape({
+      status: PropTypes.string,
+      lastTestedAt: PropTypes.string,
+      nextCheckAt: PropTypes.string,
+      lastError: PropTypes.string,
+      consecutiveFailures: PropTypes.number,
+    }),
     isActive: PropTypes.bool,
     lastError: PropTypes.string,
     priority: PropTypes.number,

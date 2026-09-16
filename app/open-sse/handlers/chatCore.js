@@ -31,6 +31,8 @@ import { stripUnsupportedModalities } from "../translator/concerns/modality.js";
 import { prefetchRemoteImages } from "../translator/concerns/prefetch.js";
 import { defaultClaudeToolType, shouldDefaultClaudeToolType } from "../translator/concerns/toolCall.js";
 import { resolveSessionId } from "../utils/sessionManager.js";
+import { shouldPreserveCacheControl } from "../utils/cacheControlPolicy.js";
+import { recordCacheUsage } from "@/lib/cacheMetrics.js";
 
 /**
  * Core chat handler - shared between SSE and Worker
@@ -61,7 +63,7 @@ export function stripContinuityFields(body) {
 
 const COMBO_THINKING_LEVELS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
 
-export async function handleChatCore({ body, modelInfo, credentials, log, onCredentialsRefreshed, onRequestSuccess, onDisconnect, clientRawRequest, connectionId, userAgent, apiKey, identityContext, ccFilterNaming, rtkEnabled, headroomEnabled, headroomUrl, headroomCompressUserMessages, headroomTimeoutMs, cavemanEnabled, cavemanLevel, ponytailEnabled, ponytailLevel, pxpipeEnabled, pxpipeMinChars, pxpipeTimeoutMs, pxpipeTransform, onPxpipeEvent, sourceFormatOverride, providerThinking, comboThinkingLevel }) {
+export async function handleChatCore({ body, modelInfo, credentials, log, onCredentialsRefreshed, onRequestSuccess, onDisconnect, clientRawRequest, connectionId, userAgent, apiKey, identityContext, ccFilterNaming, rtkEnabled, headroomEnabled, headroomUrl, headroomCompressUserMessages, headroomTimeoutMs, cavemanEnabled, cavemanLevel, ponytailEnabled, ponytailLevel, pxpipeEnabled, pxpipeMinChars, pxpipeTimeoutMs, pxpipeTransform, onPxpipeEvent, sourceFormatOverride, providerThinking, comboThinkingLevel, cacheControlMode }) {
   const { provider, model } = modelInfo;
   const requestStartTime = Date.now();
   // Stable per-session color so all lines of one CLI conversation share a tag
@@ -168,6 +170,17 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   const clientTool = detectClientTool(clientRawRequest?.headers || {}, body);
   const passthrough = isNativePassthrough(clientTool, provider);
 
+  // Prompt-cache policy (Entrega 8): preserve the client's own cache_control
+  // breakpoints instead of re-deriving them per request. Re-derivation is what
+  // thrashed the provider prompt cache (per-request breakpoint positions).
+  const preserveClientCache = shouldPreserveCacheControl({
+    mode: cacheControlMode,
+    userAgent,
+    clientTool,
+    targetProvider: provider,
+    targetFormat: targetFormat,
+  });
+
   // Expose raw client headers to translators/executors for session-id resolution
   if (credentials) credentials.rawHeaders = clientRawRequest?.headers || {};
 
@@ -206,7 +219,12 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     // Normalize newer Cowork/CC beta shapes (adaptive thinking, mid-conversation system) the API rejects
     if (clientTool === "claude") normalizeClaudePassthrough(translatedBody, translatedBody.model);
   } else {
-    translatedBody = translateRequest(sourceFormat, targetFormat, effectiveUpstreamModel, body, stream, credentials, provider, reqLogger, stripList, connectionId, clientTool);
+    // Keep the historical call shape for normal/never mode: downstream consumers
+    // (including embedders that wrap translateRequest) only see the new optional
+    // argument when cache preservation is actually enabled.
+    translatedBody = preserveClientCache
+      ? translateRequest(sourceFormat, targetFormat, effectiveUpstreamModel, body, stream, credentials, provider, reqLogger, stripList, connectionId, clientTool, true)
+      : translateRequest(sourceFormat, targetFormat, effectiveUpstreamModel, body, stream, credentials, provider, reqLogger, stripList, connectionId, clientTool);
     if (!translatedBody) {
       trackPendingRequest(model, provider, connectionId, false, true);
       return createErrorResult(HTTP_STATUS.BAD_REQUEST, `Failed to translate request for ${sourceFormat} → ${targetFormat}`);
@@ -321,11 +339,11 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     try { onPxpipeEvent?.({ provider, model, ...pxpipeSummary }); } catch { /* stats must not break requests */ }
   }
 
-  if (xf.length && log?.line) log.line(reqTag, "⚙", xf.join(" · "));
-
   // Pin cache breakpoints to the final body — every saver above can reshape
   // system/tools/messages, and a stale anchor costs a full prefix rewrite.
-  if (passthrough && clientTool === "claude") anchorClaudeCache(translatedBody);
+  if (passthrough && clientTool === "claude") anchorClaudeCache(translatedBody, preserveClientCache);
+  if (preserveClientCache) xf.push("CACHE:preserve");
+  if (xf.length && log?.line) log.line(reqTag, "⚙", xf.join(" · "));
 
   const executor = getExecutor(provider);
   trackPendingRequest(model, provider, connectionId, true);
@@ -496,7 +514,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     return createErrorResult(statusCode, errMsg, resetsAtMs);
   }
 
-  const sharedCtx = { provider, model, body, stream, translatedBody, finalBody, requestStartTime, connectionId, apiKey, clientRawRequest, onRequestSuccess, pxpipe: pxpipeSummary, reqTag, log };
+  const onCacheUsage = (tokens) => recordCacheUsage({ provider, model, preserved: preserveClientCache, tokens }).catch(() => {});
+  const sharedCtx = { provider, model, body, stream, translatedBody, finalBody, requestStartTime, connectionId, apiKey, clientRawRequest, onRequestSuccess, pxpipe: pxpipeSummary, reqTag, log, onCacheUsage };
   const appendLog = (extra) => appendRequestLog({ model, provider, connectionId, ...extra }).catch(() => { });
   const trackDone = () => trackPendingRequest(model, provider, connectionId, false);
 

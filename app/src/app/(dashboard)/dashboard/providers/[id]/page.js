@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import PropTypes from "prop-types";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,6 +14,7 @@ import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import { translate } from "@/i18n/runtime";
 import { fetchSuggestedModels } from "@/shared/utils/providerModelsFetcher";
+import { getRelativeTime } from "@/shared/utils";
 import { getProviderCustomModelRows } from "@/shared/utils/providerCustomModels";
 import ModelRow from "./ModelRow";
 import PassthroughModelsSection from "./PassthroughModelsSection";
@@ -35,6 +37,59 @@ const AUTO_PING_SETTINGS_KEYS = {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// Credential health detail: last check, next scheduled check, last error, and a
+// manual trigger. Attribute of the connection — no page, no tab.
+function ConnectionHealthPanel({ connections, running, onTestNow }) {
+  const withHealth = connections.filter((c) => c.health);
+  const failing = withHealth.filter((c) => c.health.status === "error");
+  if (connections.length === 0) return null;
+
+  const oldestCheck = withHealth
+    .map((c) => c.health.lastTestedAt)
+    .filter(Boolean)
+    .sort()[0] || null;
+
+  return (
+    <div className="mb-3 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
+          <span className="font-medium text-text-main">Credential health</span>
+          <span>{withHealth.length}/{connections.length} checked</span>
+          {oldestCheck && <span>last sweep {getRelativeTime(oldestCheck)}</span>}
+          {failing.length > 0
+            ? <span className="text-red-500">{failing.length} failing</span>
+            : <span className="text-success">all passing</span>}
+        </div>
+        <Button size="sm" variant="secondary" icon="monitor_heart" onClick={onTestNow} disabled={running}>
+          {running ? "Checking…" : "Test now"}
+        </Button>
+      </div>
+      {failing.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1">
+          {failing.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-medium">{c.name || c.email || c.id.slice(0, 8)}</span>
+              <span className="text-red-500">{c.health.lastError || "failed"}</span>
+              {c.health.consecutiveFailures > 1 && (
+                <span className="text-text-muted">{c.health.consecutiveFailures} consecutive failures</span>
+              )}
+              {c.health.backoffLevel > 0 && (
+                <span className="text-text-muted">backoff level {c.health.backoffLevel}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+ConnectionHealthPanel.propTypes = {
+  connections: PropTypes.array.isRequired,
+  running: PropTypes.bool,
+  onTestNow: PropTypes.func.isRequired,
+};
 
 export default function ProviderDetailPage() {
   const params = useParams();
@@ -302,18 +357,23 @@ export default function ProviderDetailPage() {
 
   const fetchConnections = useCallback(async () => {
     try {
-      const [connectionsRes, nodesRes, proxyPoolsRes, settingsRes] = await Promise.all([
+      const [connectionsRes, nodesRes, proxyPoolsRes, settingsRes, healthRes] = await Promise.all([
         fetch("/api/providers", { cache: "no-store" }),
         fetch("/api/provider-nodes", { cache: "no-store" }),
         fetch("/api/proxy-pools?isActive=true", { cache: "no-store" }),
         fetch("/api/settings", { cache: "no-store" }),
+        fetch("/api/providers/health", { cache: "no-store" }).catch(() => null),
       ]);
       const connectionsData = await connectionsRes.json();
       const nodesData = await nodesRes.json();
       const proxyPoolsData = await proxyPoolsRes.json();
       const settingsData = settingsRes.ok ? await settingsRes.json() : {};
+      const healthData = healthRes?.ok ? await healthRes.json().catch(() => ({})) : {};
+      const healthById = Object.fromEntries((healthData.connections || []).map((h) => [h.id, h]));
       if (connectionsRes.ok) {
-        const filtered = (connectionsData.connections || []).filter(c => c.provider === providerId);
+        const filtered = (connectionsData.connections || [])
+          .filter(c => c.provider === providerId)
+          .map(c => ({ ...c, health: healthById[c.id] || null }));
         setConnections(filtered);
       }
       if (proxyPoolsRes.ok) {
@@ -665,6 +725,22 @@ export default function ProviderDetailPage() {
       alert(translate("Error fetching models") + ": " + error.message);
     } finally {
       setImportingClineModels(false);
+    }
+  };
+
+  const [healthSweepRunning, setHealthSweepRunning] = useState(false);
+
+  // Same code path the background scheduler uses (POST /api/providers/health).
+  const handleRunHealthSweep = async () => {
+    if (healthSweepRunning) return;
+    setHealthSweepRunning(true);
+    try {
+      const res = await fetch("/api/providers/health", { method: "POST" });
+      if (res.ok) await fetchConnections();
+    } catch (error) {
+      console.log("Error running credential health sweep:", error);
+    } finally {
+      setHealthSweepRunning(false);
     }
   };
 
@@ -1647,6 +1723,11 @@ export default function ProviderDetailPage() {
                   </label>
                 </div>
               )}
+              <ConnectionHealthPanel
+                connections={connections}
+                running={healthSweepRunning}
+                onTestNow={handleRunHealthSweep}
+              />
               {connectionsList}
               {!isCompatible && (
                 <div className="mt-4 grid grid-cols-1 gap-2 sm:flex">
