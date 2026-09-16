@@ -75,13 +75,15 @@ let notebooksCache = null; // {at, notebooks} — endpoint already caches; this 
 function NotebookPicker({ values, onChange, disabled }) {
   const items = (Array.isArray(values) ? values : []).map(String);
   const all = items.includes(ALL_NOTEBOOKS);
-  const [state, setState] = useState(() => (notebooksCache ? { status: "ready", notebooks: notebooksCache.notebooks } : { status: "idle", notebooks: [] }));
+  const fresh = () => Boolean(notebooksCache) && Date.now() - notebooksCache.at < NOTEBOOKS_CACHE_MS;
+  const [state, setState] = useState(() => (fresh()
+    ? { status: "ready", notebooks: notebooksCache.notebooks }
+    : { status: "loading", notebooks: [] }));
   const [manualId, setManualId] = useState("");
 
   useEffect(() => {
-    if (notebooksCache && Date.now() - notebooksCache.at < NOTEBOOKS_CACHE_MS) return;
+    if (fresh()) return;
     let alive = true;
-    setState({ status: "loading", notebooks: [] });
     (async () => {
       try {
         const res = await fetch("/api/sources/open-notebook/notebooks");
