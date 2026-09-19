@@ -208,6 +208,7 @@ export const ZED_HOSTED_CONFIG = {
   llmBaseUrl: "https://cloud.zed.dev",
   defaultNativeAppPort: 58443,
   oauthTimeoutMs: 600_000,
+  profileTimeoutMs: 2_000,
 };
 
 // OAuth timeout (5 minutes)

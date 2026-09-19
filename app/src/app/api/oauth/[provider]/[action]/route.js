@@ -309,13 +309,75 @@ export async function POST(request, { params }) {
       let ok = false;
       if (provider === "trae") ok = registerTraeSession({ state });
       else if (provider === "windsurf") ok = registerWindsurfSession({ state });
-      else if (provider === "zed") ok = registerZedSession({ state, codeVerifier: body?.codeVerifier });
+      else if (provider === "zed") ok = registerZedSession({ state, codeVerifier: body?.codeVerifier, systemId: body?.systemId });
       else return NextResponse.json({ error: "register-session only supported for trae/windsurf/zed" }, { status: 400 });
       return NextResponse.json({ success: ok });
     }
 
     if (action === "exchange") {
-      const { code, redirectUri, codeVerifier, state, meta } = body;
+      const { code, redirectUri, codeVerifier, state, meta, systemId } = body;
+
+      // Xiaomi MiMo: no token exchange needed — the callback already decrypted the sk.
+      // Just read the session result and create the connection.
+      if (provider === "xiaomi-mimo") {
+        if (!state) {
+          return NextResponse.json({ error: "Missing state" }, { status: 400 });
+        }
+        const session = getXiaomiMimoSessionStatus(state);
+        if (!session || session.status !== "done" || !session.result) {
+          return NextResponse.json(
+            { error: session?.error || "OAuth session not completed. Please restart the login flow." },
+            { status: 400 },
+          );
+        }
+        const { uid, accessToken, baseUrl } = session.result;
+
+        // Desktop-exclusive Preview models authenticate with the account-session
+        // passToken, which only lives in MiMo Desktop's cookie store — attach it
+        // to the connection so those models work right after OAuth.
+        let passToken = null;
+        try {
+          passToken = await readDesktopPassToken();
+        } catch {
+          // Desktop not installed / cookie DB locked — preview models stay unavailable.
+        }
+
+        try {
+          const connection = await createProviderConnection({
+            provider: "xiaomi-mimo",
+            authType: "oauth",
+            accessToken,
+            refreshToken: null,
+            expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            email: uid ? `${uid}@xiaomi` : null,
+            displayName: uid ? `Xiaomi ${uid}` : "Xiaomi MiMo",
+            providerSpecificData: {
+              uid: uid || null,
+              baseUrl: baseUrl || "https://api.xiaomimimo.com/v1",
+              authMethod: "oauth",
+              mimoPassToken: passToken?.passToken || null,
+              mimoUserId: passToken?.userId || null,
+              mimoCUserId: passToken?.cUserId || null,
+            },
+            testStatus: "active",
+          });
+          clearXiaomiMimoSession(state);
+          stopXiaomiMimoProxy();
+          return NextResponse.json({
+            success: true,
+            connection: {
+              id: connection.id,
+              provider: connection.provider,
+              email: connection.email,
+              displayName: connection.displayName,
+            },
+          });
+        } catch (err) {
+          clearXiaomiMimoSession(state);
+          stopXiaomiMimoProxy();
+          return NextResponse.json({ error: err.message }, { status: 500 });
+        }
+      }
 
       // Xiaomi MiMo: no token exchange needed — the callback already decrypted the sk.
       // Just read the session result and create the connection.
@@ -459,8 +521,13 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
 
-      // Exchange code for tokens (meta carries provider-specific params, e.g. gitlab clientId/baseUrl)
-      const tokenData = await exchangeTokens(provider, code, redirectUri, codeVerifier, state, meta);
+      // Exchange code for tokens (meta carries provider-specific params, e.g. gitlab clientId/baseUrl).
+      // systemId (Zed) is merged into meta so the login attempt's own id is
+      // used instead of a freshly prepared one. Ignored by other providers.
+      const tokenData = await exchangeTokens(provider, code, redirectUri, codeVerifier, state, {
+        ...(meta || {}),
+        ...(systemId ? { systemId } : {}),
+      });
 
       // Save to database
       const connection = await createProviderConnection({

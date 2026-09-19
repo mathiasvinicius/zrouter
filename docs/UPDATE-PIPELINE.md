@@ -4,20 +4,21 @@ Como absorver melhorias do upstream (9Router, OmniRoute) **sem quebrar os custom
 
 ---
 
-## 1. Por que isto é gerenciável (medido, não estimado)
+## 1. Estado atual
 
-Comparação real da árvore do ZRouter contra a tag base do upstream (`v0.5.75`):
+O 9Router vive vendorizado em `app/`; os históricos Git não possuem ancestral comum.
+Por isso, `git merge upstream/<tag>` **não é válido**. A atualização correta é um patch
+binário de três vias entre a tag-base e a tag-alvo, aplicado sob `app/`.
 
 | Métrica | Valor |
 |---|---|
-| Arquivos na base v0.5.75 | 1.291 |
-| Arquivos **criados** por nós | **41** |
-| Arquivos **removidos** por nós | 2 |
-| Arquivos comuns à base | 1.558 |
-| Arquivos **modificados** por nós | **78 (5%)** |
+| Base integrada | `v0.5.81` |
+| Destino do 9Router | `app/` |
+| Estratégia 9Router | patch de três vias vendorizado |
+| Estratégia OmniRoute | ports seletivos registrados em `ports/omniroute.json` |
 
-**Conclusão:** 95% da base é upstream intocado. O risco está concentrado em 78 arquivos.
-Este é o número que a pipeline precisa proteger — não os 1.500.
+O inventário exato é sempre regenerado por `audit-customs.mjs`; números antigos não
+devem ser copiados para decisões futuras.
 
 ### Pontos de acoplamento (onde os conflitos vão doer)
 
@@ -39,13 +40,16 @@ Ordenados por risco (tamanho × centralidade):
 
 ---
 
-## 2. Regra de ouro: **NUNCA rebase — sempre MERGE**
+## 2. Regra de ouro: atualização vendorizada, nunca merge/rebase do upstream
 
-Rebase (ou `pull --rebase`) reescreve nossos 13 commits por cima do upstream e vai gerar
-conflito **em cada commit nosso**, um por um. É lento e perigoso.
+Use uma branch/worktree de integração e execute:
 
-**Use merge de tag upstream para uma branch de integração.** Um único ponto de conflito,
-resolvido uma vez, com histórico preservado.
+```bash
+scripts/update/stage-9router-update.sh vX.Y.Z
+```
+
+O script calcula `zrouter-base-* -> vX.Y.Z` e aplica o delta em `app/` com `git apply
+--3way`. Isso preserva o layout do ZRouter e expõe apenas conflitos reais.
 
 ---
 
@@ -61,7 +65,7 @@ git push origin zrouter-base-v0.5.75
 ### 3.2 Adicionar o upstream como remote
 ```bash
 git remote add upstream https://github.com/decolua/9router.git
-git fetch upstream --tags
+git fetch upstream 'refs/tags/v*:refs/tags/v*'
 ```
 
 ### 3.3 Congelar o inventário de customs (a "linha de base")
@@ -95,8 +99,9 @@ Update que toca apenas arquivos que nunca tocamos = merge trivial, pode acumular
 ### FASE 1 — Branch de integração (sempre isolada)
 
 ```bash
-git checkout -b update/v0.5.80 main
-git merge --no-commit --no-ff upstream/v0.5.80
+git worktree add -b update/9router-v0.5.82 ../zrouter-update-v0.5.82 main
+cd ../zrouter-update-v0.5.82
+scripts/update/stage-9router-update.sh v0.5.82
 git diff --name-only --diff-filter=U   # os conflitos
 ```
 
@@ -148,8 +153,8 @@ Só depois de 1-4 verdes:
 
 ```bash
 git checkout main
-git merge --no-ff update/v0.5.80
-git tag -a zrouter-base-v0.5.80 -m "Upstream 9Router v0.5.80 absorvido"
+git merge --no-ff update/9router-v0.5.82
+git tag -a zrouter-base-v0.5.82 v0.5.82 -m "Upstream 9Router v0.5.82 absorvido"
 git push origin main --tags
 node scripts/update/audit-customs.mjs --base v0.5.80 --out docs/CUSTOMS.md   # atualiza a memória
 ```
@@ -225,7 +230,7 @@ Um update **nunca** roda sozinho até a `main`. A pipeline para na Fase 4 espera
 
 ## 8. Regras invioláveis do fork
 
-1. **Nunca `rebase`** — sempre `merge` da tag upstream
+1. **Nunca `merge`/`rebase` do upstream** — ele é vendorizado em `app/`; use o patch de três vias
 2. **Nunca** atualizar direto na `main`
 3. **Nunca** aceitar update que reintroduza credencial (repo é público)
 4. **Nunca** remover um teste nosso para fazer o build passar

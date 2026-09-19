@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "upstreams": {
+    "9router": {
+      "repository": "https://github.com/decolua/9router.git",
+      "ref": "v0.5.81",
+      "commit": "a8c9d3802c5933500fba95416f5bf0c130581396",
+      "destination": "app/",
+      "strategy": "vendored-three-way"
+    },
+    "omniroute": {
+      "repository": "https://github.com/diegosouzapw/OmniRoute.git",
+      "ref": "release/v3.8.51",
+      "commit": "7a921299",
+      "strategy": "selective-port-only"
+    }
+  }
+}

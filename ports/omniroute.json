@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "policy": "Ports seletivos, pequenos e testados; nunca merge integral do OmniRoute.",
+  "ports": [
+    {
+      "id": "compression-responses-body-adapter",
+      "status": "implemented",
+      "source": "open-sse/services/compression/bodyAdapter.ts",
+      "targets": [
+        "app/open-sse/rtk/index.js",
+        "app/open-sse/rtk/constants.js"
+      ],
+      "scope": "custom_tool_call_output, local_shell_call_output, apply_patch_call_output, content fallback e wrapper JSON",
+      "tests": ["app/tests/unit/rtk-responses-output.test.js"]
+    },
+    {
+      "id": "compression-inflation-guard",
+      "status": "already-present",
+      "source": "release/v3.8.42",
+      "targets": ["app/open-sse/rtk/index.js"],
+      "scope": "Descarta saída vazia ou maior/igual à entrada"
+    },
+    {
+      "id": "cache-usage-token-shapes",
+      "status": "implemented",
+      "source": "usage normalization pattern",
+      "targets": ["app/src/lib/cacheMetrics.js"],
+      "scope": "input_tokens_details e prompt_tokens_details",
+      "tests": ["app/tests/unit/cache-metrics-token-shapes.test.js"]
+    },
+    {
+      "id": "compression-worker-fallback",
+      "status": "candidate",
+      "reason": "Só portar se o worker externo for ativado; RTK atual já é in-process."
+    },
+    {
+      "id": "credential-health-probe-policy-cache",
+      "status": "candidate",
+      "reason": "Alto valor para reduzir probes e falsos positivos, mas exige testes de scheduler antes de produção."
+    },
+    {
+      "id": "semantic-cache-redis-vector",
+      "status": "rejected",
+      "reason": "Aumenta estado, dependências e superfície operacional sem resolver a falha atual."
+    },
+    {
+      "id": "electron-a2a-marketplace-embedded-services",
+      "status": "rejected",
+      "reason": "Fora do papel enxuto do ZRouter."
+    }
+  ]
+}

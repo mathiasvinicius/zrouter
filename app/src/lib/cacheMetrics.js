@@ -12,6 +12,9 @@
  */
 
 import { makeKv } from "@/lib/db/helpers/kvStore.js";
+import { extractCacheTokenCounts } from "@/lib/cacheTokenShapes.js";
+
+export { extractCacheTokenCounts } from "@/lib/cacheTokenShapes.js";
 
 const kv = makeKv("cacheMetrics");
 const FLUSH_MS = 2000;
@@ -115,7 +118,9 @@ export function recordCacheOutcome({ provider, preserved, inputTokens, cachedTok
  */
 export async function recordCacheUsage({ provider, model, preserved, tokens } = {}) {
   const t = tokens || {};
-  const cachedTokens = t.cached_tokens || t.cache_read_input_tokens || 0;
+  // Providers expose cache reads in different OpenAI/Anthropic-compatible
+  // locations. Prefer the direct fields, then the nested Responses/Chat fields.
+  const { cachedTokens, cacheCreationTokens } = extractCacheTokenCounts(t);
   const inputTokens = t.prompt_tokens || t.input_tokens || 0;
   let costSaved = 0;
   if (cachedTokens > 0) {
@@ -134,7 +139,7 @@ export async function recordCacheUsage({ provider, model, preserved, tokens } = 
     preserved,
     inputTokens,
     cachedTokens,
-    cacheCreationTokens: t.cache_creation_input_tokens || 0,
+    cacheCreationTokens,
     costSaved,
   });
 }
