@@ -82,6 +82,17 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   const bypassResponse = handleBypassRequest(body, model, userAgent, ccFilterNaming);
   if (bypassResponse) return bypassResponse;
 
+  // Per-request opt-out: client can bypass all token savers via header.
+  const tokenSaverEnabled = clientRawRequest?.headers?.[TOKEN_SAVER_HEADER]?.toLowerCase() !== "off";
+
+  // RTK must run on the client/source shape. Running it after translation skips
+  // Responses tool outputs whenever the selected provider translates them into
+  // Gemini/Antigravity contents. Compressing here also matches the documented
+  // pre-translate lifecycle and keeps every provider path covered.
+  const rtkStats = compressMessages(body, tokenSaverEnabled && rtkEnabled);
+  const rtkLine = formatRtkLog(rtkStats);
+  if (rtkLine) console.log(rtkLine);
+
   const alias = PROVIDER_ID_TO_ALIAS[provider] || provider;
   const modelTargetFormat = getModelTargetFormat(alias, model);
   // Multi-endpoint providers: pick transport matching sourceFormat → zero translation.
@@ -286,14 +297,6 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   if (shouldDefaultClaudeToolType(provider, finalFormat, translatedBody.tools, PROVIDERS)) {
     translatedBody.tools = defaultClaudeToolType(translatedBody.tools);
   }
-
-  // Per-request opt-out: client can bypass all token savers via header
-  const tokenSaverEnabled = clientRawRequest?.headers?.[TOKEN_SAVER_HEADER]?.toLowerCase() !== "off";
-
-  // RTK: compress tool_result content
-  const rtkStats = compressMessages(translatedBody, tokenSaverEnabled && rtkEnabled);
-  const rtkLine = formatRtkLog(rtkStats);
-  if (rtkLine) console.log(rtkLine);
 
   // Headroom: optional external proxy compression; fail open if proxy is absent.
   const headroomDiagnostics = {};
