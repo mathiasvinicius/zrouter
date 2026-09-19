@@ -1,9 +1,12 @@
 // RTK port: compress tool_result content in LLM request bodies
 // Injected at the top of translateRequest (before any format translation)
-import { RAW_CAP, MIN_COMPRESS_SIZE } from "./constants.js";
+import { RAW_CAP, MIN_COMPRESS_SIZE, RESPONSES_TOOL_OUTPUT_TYPES } from "./constants.js";
 import { autoDetectFilter } from "./autodetect.js";
 import { safeApply } from "./applyFilter.js";
 
+// OpenAI Responses emits several tool-output item types. Codex commonly uses
+// custom/local-shell/apply-patch outputs instead of function_call_output, so
+// handling only the latter makes RTK appear enabled while skipping most calls.
 // Compress tool_result content in-place. Returns stats or null if disabled/failed.
 export function compressMessages(body, enabled) {
   if (!enabled) return null;
@@ -26,18 +29,11 @@ export function compressMessages(body, enabled) {
       const msg = items[i];
       if (!msg) continue;
 
-      // Shape 4: OpenAI Responses — top-level { type:"function_call_output", output: string | [{type:"input_text", text}] }
-      if (msg.type === "function_call_output") {
-        if (typeof msg.output === "string") {
-          msg.output = compressText(msg.output, stats, "openai-responses-string");
-        } else if (Array.isArray(msg.output)) {
-          for (let k = 0; k < msg.output.length; k++) {
-            const part = msg.output[k];
-            if (part && part.type === "input_text" && typeof part.text === "string") {
-              part.text = compressText(part.text, stats, "openai-responses-array");
-            }
-          }
-        }
+      // Shape 4: OpenAI Responses tool outputs. Some clients use `content`
+      // instead of `output`; custom-tool output may be a JSON wrapper whose
+      // metadata must survive compression unchanged.
+      if (RESPONSES_TOOL_OUTPUT_TYPES.has(msg.type)) {
+        compressResponsesToolOutput(msg, stats);
         continue;
       }
 
@@ -85,6 +81,43 @@ export function compressMessages(body, enabled) {
     return null;
   }
   return stats;
+}
+
+function compressResponsesToolOutput(item, stats) {
+  const field = item.output !== undefined && item.output !== null ? "output" : "content";
+  const value = item[field];
+  const shape = `openai-responses-${item.type}`;
+
+  if (item.type === "custom_tool_call_output") {
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.output === "string") {
+          parsed.output = compressText(parsed.output, stats, `${shape}-wrapped`);
+          item[field] = JSON.stringify(parsed);
+          return;
+        }
+      } catch { /* plain text */ }
+      item[field] = compressText(value, stats, `${shape}-string`);
+      return;
+    }
+    if (value && typeof value === "object" && !Array.isArray(value) && typeof value.output === "string") {
+      value.output = compressText(value.output, stats, `${shape}-object`);
+      return;
+    }
+  }
+
+  if (typeof value === "string") {
+    item[field] = compressText(value, stats, `${shape}-string`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const part of value) {
+      if (part && (part.type === "input_text" || part.type === "text") && typeof part.text === "string") {
+        part.text = compressText(part.text, stats, `${shape}-array`);
+      }
+    }
+  }
 }
 
 // Compress Kiro format: conversationState.history[].userInputMessage.userInputMessageContext.toolResults[].content[].text
