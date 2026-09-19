@@ -8,9 +8,10 @@
       "source": "open-sse/services/compression/bodyAdapter.ts",
       "targets": [
         "app/open-sse/rtk/index.js",
-        "app/open-sse/rtk/constants.js"
+        "app/open-sse/rtk/constants.js",
+        "app/open-sse/handlers/chatCore.js"
       ],
-      "scope": "custom_tool_call_output, local_shell_call_output, apply_patch_call_output, content fallback e wrapper JSON",
+      "scope": "custom_tool_call_output, local_shell_call_output, apply_patch_call_output, content fallback, wrapper JSON e compressão pre-translate",
       "tests": ["app/tests/unit/rtk-responses-output.test.js"]
     },
     {

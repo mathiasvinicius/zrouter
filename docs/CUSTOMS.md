@@ -1,7 +1,7 @@
 # CUSTOMS — o que o ZRouter mudou em relação ao upstream
 
-> **Gerado automaticamente** por `scripts/update/audit-customs.mjs` em 2026-09-19 21:26:05.
-> Base: `v0.5.81` (raiz do upstream 9Router) · comparada contra `app/` · HEAD `a725a3de`
+> **Gerado automaticamente** por `scripts/update/audit-customs.mjs` em 2026-09-19 21:39:12.
+> Base: `v0.5.81` (raiz do upstream 9Router) · comparada contra `app/` · HEAD `5e00db5f`
 >
 > **Não edite à mão.** Este documento é a memória do fork: a pipeline
 > (`docs/UPDATE-PIPELINE.md`) o consulta ao resolver conflitos de merge.
@@ -9,14 +9,14 @@
 
 ## Resumo
 
-- **Modificados** (existem no upstream): **210** — onde um merge disputa conteúdo
-- **Adicionados** (só nossos): 105
-- **Removidos** (no upstream, não em nós): 151
+- **Modificados** (existem no upstream): **216** — onde um merge disputa conteúdo
+- **Adicionados** (só nossos): 80
+- **Removidos** (no upstream, não em nós): 145
 
 O risco de um update mora nos **modificados**. Adicionados e removidos normalmente
 resolvem sozinhos.
 
-## Modificados (210) — pontos de acoplamento
+## Modificados (216) — pontos de acoplamento
 
 ### `public/i18n` (34)
 
@@ -195,7 +195,7 @@ resolvem sozinhos.
 
 ### `open-sse/handlers` (6)
 
-- `open-sse/handlers/chatCore.js` — +44/-9
+- `open-sse/handlers/chatCore.js` — +50/-12
 - `open-sse/handlers/chatCore/nonStreamingHandler.js` — +2/-1
 - `open-sse/handlers/chatCore/sseToJsonHandler.js` — +3/-1
 - `open-sse/handlers/chatCore/streamingHandler.js` — +11/-2
@@ -244,6 +244,12 @@ resolvem sozinhos.
 - `cli/hooks/sqliteRuntime.js` — +1/-1
 - `cli/hooks/trayRuntime.js` — +3/-3
 
+### `docs/superpowers` (3)
+
+- `docs/superpowers/plans/2026-09-04-opencode-go-session-header.md` — +1/-1
+- `docs/superpowers/specs/2026-08-02-gpt-5-6-codex-reasoning-overrides-design.md` — +3/-3
+- `docs/superpowers/specs/2026-09-04-opencode-go-session-header-design.md` — +2/-2
+
 ### `open-sse/rtk` (3)
 
 - `open-sse/rtk/constants.js` — +6/-0
@@ -254,6 +260,16 @@ resolvem sozinhos.
 
 - `cli/scripts/build-cli.js` — +1/-1
 - `cli/scripts/buildMitm.js` — +1/-1
+
+### `open-sse/config` (2)
+
+- `open-sse/config/errorConfig.js` — +3/-0
+- `open-sse/config/kiroConstants.js` — +6/-6
+
+### `open-sse/services` (2)
+
+- `open-sse/services/combo.js` — +7/-1
+- `open-sse/services/kiroModels.js` — +4/-4
 
 ### `public/icons` (2)
 
@@ -283,11 +299,15 @@ resolvem sozinhos.
 
 ### `Dockerfile` (1)
 
-- `Dockerfile` — +1/-2
+- `Dockerfile` — +4/-2
 
 ### `README.md` (1)
 
 - `README.md` — +32/-15
+
+### `custom-server.js` (1)
+
+- `custom-server.js` — +0/-0
 
 ### `docs` (1)
 
@@ -296,14 +316,6 @@ resolvem sozinhos.
 ### `next.config.mjs` (1)
 
 - `next.config.mjs` — +6/-3
-
-### `open-sse/config` (1)
-
-- `open-sse/config/kiroConstants.js` — +6/-6
-
-### `open-sse/services` (1)
-
-- `open-sse/services/kiroModels.js` — +4/-4
 
 ### `open-sse/utils` (1)
 
@@ -357,45 +369,16 @@ resolvem sozinhos.
 
 - `tests/__baseline__/providers-baseline.json` — +0/-14
 
-## Adicionados (105) — arquivos nossos
+## Adicionados (80) — arquivos nossos
 
-### `zrouter/app` (27)
-
-- `zrouter/app/node_modules/next/dist/compiled/jest-worker/processChild.js`
-- `zrouter/app/node_modules/next/dist/compiled/jest-worker/threadChild.js`
-- `zrouter/app/node_modules/next/dist/server/lib/start-server.js`
-- `zrouter/app/node_modules/next/dist/server/next-server.js`
-- `zrouter/app/node_modules/next/dist/server/next.js`
-- `zrouter/app/node_modules/next/dist/server/require-hook.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/module.compiled.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/app-router-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/entrypoints.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/head-manager-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/hooks-client-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/image-config-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/router-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/app-page/vendored/contexts/server-inserted-html.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/module.compiled.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/app-router-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/entrypoints.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/head-manager-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/hooks-client-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/html-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/image-config-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/loadable-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/loadable.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/router-context.js`
-- `zrouter/app/node_modules/next/dist/server/route-modules/pages/vendored/contexts/server-inserted-html.js`
-- `zrouter/app/node_modules/styled-jsx/index.js`
-- `zrouter/app/node_modules/styled-jsx/style.js`
-
-### `tests/unit` (25)
+### `tests/unit` (26)
 
 - `tests/unit/api-key-profile-options.test.js`
 - `tests/unit/cache-metrics-token-shapes.test.js`
 - `tests/unit/cache-policy.test.js`
 - `tests/unit/capabilities-block.test.js`
 - `tests/unit/color-themes.test.js`
+- `tests/unit/combo-model-gone-fallback.test.js`
 - `tests/unit/credential-health.test.js`
 - `tests/unit/ensure-bank-neo4j.test.js`
 - `tests/unit/identity-memory-backend-selection.test.js`
@@ -526,21 +509,19 @@ resolvem sozinhos.
 
 - `skills/zrouter-web-search/SKILL.md`
 
+### `tests` (1)
+
+- `tests/package-lock.json`
+
 ### `tests/translator` (1)
 
 - `tests/translator/__snapshots__/golden-url-header.test.js.snap`
 
-## Removidos (151)
+## Removidos (145)
 
 - `.github/workflows/gitbook-pages.yml`
 - `README.zh-CN.md`
 - `docker-compose.yml`
-- `docs/images/saml-admin-dashboard.png`
-- `docs/images/saml-login-screen.png`
-- `docs/superpowers/plans/2026-08-02-gpt-5-6-codex-reasoning-overrides.md`
-- `docs/superpowers/plans/2026-09-04-opencode-go-session-header.md`
-- `docs/superpowers/specs/2026-08-02-gpt-5-6-codex-reasoning-overrides-design.md`
-- `docs/superpowers/specs/2026-09-04-opencode-go-session-header-design.md`
 - `gitbook/.gitignore`
 - `gitbook/app/[lang]/[...slug]/page.js`
 - `gitbook/app/[lang]/page.js`
