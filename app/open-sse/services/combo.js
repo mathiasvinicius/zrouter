@@ -6,6 +6,7 @@ import { checkFallbackError, formatRetryAfter } from "./accountFallback.js";
 import { unavailableResponse } from "../utils/error.js";
 import { getCapabilitiesForModel } from "../providers/capabilities.js";
 import { extractTextContent } from "../translator/formats/gemini.js";
+import { COMBO_MODEL_UNAVAILABLE_STATUSES } from "../config/errorConfig.js";
 
 // Hard capabilities = input modalities; missing one drops request data (e.g. image
 // stripped). Must be prioritized. Soft (e.g. search) only degrades a feature.
@@ -332,7 +333,12 @@ export async function handleComboChat({ body, models, handleSingleModel, log, co
       }
 
       // Check if should fallback to next model
-      const { shouldFallback, cooldownMs } = checkFallbackError(result.status, errorText);
+      const accountDecision = checkFallbackError(result.status, errorText);
+      const shouldFallback = COMBO_MODEL_UNAVAILABLE_STATUSES.has(result.status)
+        || accountDecision.shouldFallback;
+      const cooldownMs = COMBO_MODEL_UNAVAILABLE_STATUSES.has(result.status)
+        ? 0
+        : accountDecision.cooldownMs;
 
       if (!shouldFallback) {
         log.warn("COMBO", `Model ${modelStr} failed (no fallback)`, { status: result.status });
