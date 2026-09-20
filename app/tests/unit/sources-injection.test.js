@@ -143,6 +143,21 @@ describe("ZROUTER_SOURCES block", () => {
     expect(body.messages[0].content).toContain("KEY FALLBACK SOUL");
   });
 
+  it("does not replicate a capabilities catalog already present in the client system prompt", async () => {
+    const { injectIdentity, bodyHasCapabilitiesCatalog } = await import("open-sse/rtk/identity.js");
+    const body = { messages: [
+      { role: "system", content: "<!-- ZROUTER_CAPABILITIES:v1 -->\nexisting catalog" },
+      { role: "user", content: "oi" },
+    ] };
+    expect(bodyHasCapabilitiesCatalog(body)).toBe(true);
+    expect(injectIdentity(body, "openai", {
+      globalInstructions: "GLOBAL",
+      capabilities: "<!-- ZROUTER_CAPABILITIES:v1 -->\nnew catalog",
+    })).toBe(true);
+    expect(body.messages[0].content.match(/ZROUTER_CAPABILITIES/g)).toHaveLength(1);
+    expect(body.messages[0].content).not.toContain("new catalog");
+  });
+
   it("is not emitted for a service key (no identityContext at all)", () => {
     expect(promptFor(null)).toBe("");
   });

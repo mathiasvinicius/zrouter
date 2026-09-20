@@ -30,6 +30,7 @@ describe("ZROUTER_CAPABILITIES block", () => {
     const block = buildCapabilitiesBlock(SKILLS, []);
     expect(block).toContain("- chat: POST /v1/chat/completions");
     expect(block).toContain("- models: GET /v1/models");
+    expect(block).toContain("- skills: GET /v1/skills");
   });
 
   it("sources:/knowledge: lines reflect exactly the key's enabled origins", () => {
@@ -55,6 +56,7 @@ describe("ZROUTER_CAPABILITIES block", () => {
     expect(block.length).toBeLessThanOrEqual(MAX_CAPABILITIES_CHARS);
     expect(block).toContain("- chat: POST /v1/chat/completions");
     expect(block).toContain("- models: GET /v1/models");
+    expect(block).toContain("- skills: GET /v1/skills");
     expect(block).toContain("- sources: open-notebook");
     expect(block).toContain("ZROUTER_CAPABILITIES");
   });

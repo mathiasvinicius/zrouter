@@ -10,7 +10,7 @@ export const CAPABILITIES_MARKER = "<!-- ZROUTER_CAPABILITIES:v1 -->";
 export const MAX_CAPABILITIES_CHARS = 1200;
 
 // Capability labels whose lines are never dropped when the char budget is exceeded.
-const ALWAYS = ["chat", "models", "sources"];
+const ALWAYS = ["chat", "models", "skills", "sources"];
 // Skill id → capability label; unlisted ids fall back to the id minus the zrouter- prefix.
 const LABELS = {
   "zrouter-chat": "chat",
@@ -40,6 +40,7 @@ function capabilityLines(skills) {
     lines.push(skill.endpoint ? `- ${label}: POST ${skill.endpoint}` : `- ${label}`);
   }
   lines.push("- models: GET /v1/models");
+  lines.push("- skills: GET /v1/skills");
   return lines;
 }
 

@@ -30,6 +30,9 @@ tokens e isolamento de conhecimento por chave de API.
 - **Identidade sem conflito** — regras globais de memória/fontes entram primeiro. O `SOUL.md`
   personalizado da API key funciona como fallback; quando o agente já envia seu próprio
   `SOUL.md`, a identidade do agente prevalece e o gateway não injeta uma segunda.
+- **Skills centralizadas** — todo agente autenticado recebe automaticamente um índice compacto
+  gerado do registry; `GET /v1/skills` aponta para os `SKILL.md` sob demanda, sem copiar o
+  catálogo para cada agente.
 - **Inteligência de provedores** — descoberta e importação de modelos via `/models` upstream,
   sincronização automática, cotas em tempo real, saúde e análise de custo por conexão.
 - **Model Context Protocol** — 33+ ferramentas MCP prontas (Open Notebook, Notion, busca web, TTS).

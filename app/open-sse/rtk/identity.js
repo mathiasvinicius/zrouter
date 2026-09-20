@@ -1,5 +1,6 @@
 const MARKER = "<!-- ZROUTER_IDENTITY:v1 -->";
 const SOURCES_MARKER = "<!-- ZROUTER_SOURCES";
+const CAPABILITIES_MARKER = "<!-- ZROUTER_CAPABILITIES:";
 const SEPARATOR = "\n\n";
 // Per-item excerpt cap, and the default/top for the whole ZROUTER_SOURCES block.
 const EXCERPT_MAX_CHARS = 400;
@@ -86,11 +87,11 @@ function contentText(content) {
 // Agent runtimes such as Zenith/Hermes already send their own SOUL.md inside
 // the system prompt. In that case the agent identity wins and the per-key SOUL
 // remains a fallback for clients that do not carry one.
-export function bodyHasAgentSoul(body) {
+function systemTexts(body) {
   if (!body || typeof body !== "object") return false;
   const request = body.request && typeof body.request === "object" ? body.request : body;
   const systemInstruction = request.system_instruction || request.systemInstruction;
-  const texts = [
+  return [
     contentText(body.instructions),
     contentText(body.system),
     contentText(systemInstruction?.parts),
@@ -101,12 +102,28 @@ export function bodyHasAgentSoul(body) {
       .filter((message) => ["system", "developer"].includes(message?.role))
       .map((message) => contentText(message.content)) : []),
   ];
+}
+
+export function bodyHasAgentSoul(body) {
+  const texts = systemTexts(body);
+  if (!texts) return false;
   const marker = /(?:^|\n)\s*#{1,3}\s*(?:FILE:\s*[^\n]*\/)?SOUL\.md\b|<!--\s*(?:ZROUTER_)?SOUL\b/im;
   return texts.some((text) => marker.test(text));
 }
 
+export function bodyHasCapabilitiesCatalog(body) {
+  const texts = systemTexts(body);
+  return Boolean(texts && texts.some((text) => text.includes(CAPABILITIES_MARKER)));
+}
+
 export function injectIdentity(body, format, context) {
-  const effectiveContext = bodyHasAgentSoul(body) ? { ...context, soul: "" } : context;
+  const hasAgentSoul = bodyHasAgentSoul(body);
+  const hasCatalog = bodyHasCapabilitiesCatalog(body);
+  const effectiveContext = hasAgentSoul || hasCatalog ? {
+    ...context,
+    ...(hasAgentSoul ? { soul: "" } : {}),
+    ...(hasCatalog ? { capabilities: "" } : {}),
+  } : context;
   const prompt = promptFor(effectiveContext);
   if (!prompt || !body || typeof body !== "object") return false;
   const serialized = JSON.stringify(body);
