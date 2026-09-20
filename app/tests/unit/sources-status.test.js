@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 const { getSourcesStatus } = await import("open-sse/sources/status.js");
+const { isNeo4jConfigured } = await import("open-sse/sources/neo4jBackend.js");
 
 const hasOpenNotebookPassword = Boolean(process.env.OPEN_NOTEBOOK_PASSWORD);
 
@@ -19,7 +20,7 @@ describe("sources status", () => {
     expect(status["open-notebook"].latencyMs).toBeGreaterThanOrEqual(0);
   }, 15_000);
 
-  it("reports Neo4j as ok against the real server (NEO4J_AUTH from the Compose env)", async () => {
+  it.skipIf(!isNeo4jConfigured())("reports Neo4j as ok against the real server (NEO4J_AUTH from the Compose env)", async () => {
     const status = await getSourcesStatus();
     expect(status.neo4j).toMatchObject({ configured: true, ok: true, status: "ok" });
   }, 15_000);

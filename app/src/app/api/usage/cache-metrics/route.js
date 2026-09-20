@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSettings, getUsageStats } from "@/lib/localDb";
+import { getSettings } from "@/lib/localDb";
+import { getUsageStats } from "@/lib/usageDb";
 import { getCacheMetrics } from "@/lib/cacheMetrics.js";
 import { normalizeCacheControlMode } from "open-sse/utils/cacheControlPolicy.js";
 
@@ -43,6 +44,9 @@ export async function GET(request) {
     } : metrics;
     return NextResponse.json({
       ...current,
+      // Policy counters have daily precision; do not present them as rolling 24h.
+      policyPeriod: period === "24h" ? "today" : period,
+      policyRequests: metrics.requests || 0,
       mode: normalizeCacheControlMode(settings.cacheControlMode),
     });
   } catch (error) {

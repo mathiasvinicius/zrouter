@@ -66,6 +66,7 @@ export default function TokenSaverClient() {
   const [pxpipeActionError, setPxpipeActionError] = useState("");
   const [cacheMode, setCacheMode] = useState("auto");
   const [cacheMetrics, setCacheMetrics] = useState(null);
+  const [cacheMetricsError, setCacheMetricsError] = useState(false);
   const [locale, setLocale] = useState("en");
 
   const { copied, copy } = useCopyToClipboard();
@@ -407,8 +408,12 @@ export default function TokenSaverClient() {
   const loadCacheMetrics = useCallback(async () => {
     try {
       const res = await fetch("/api/usage/cache-metrics?period=24h");
-      if (res.ok) setCacheMetrics(await res.json());
-    } catch {}
+      if (!res.ok) throw new Error("Cache metrics unavailable");
+      setCacheMetrics(await res.json());
+      setCacheMetricsError(false);
+    } catch {
+      setCacheMetricsError(true);
+    }
   }, []);
 
   const handleCacheMode = (mode) => {
@@ -849,27 +854,31 @@ export default function TokenSaverClient() {
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 pt-4 mt-4 border-t border-border sm:grid-cols-4">
+        {cacheMetricsError ? (
+          <p role="alert" className="pt-4 mt-4 text-sm text-text-muted">
+            Cache metrics unavailable. Reload to try again.
+          </p>
+        ) : <div className="grid grid-cols-2 gap-3 pt-4 mt-4 border-t border-border sm:grid-cols-4">
           <div>
             <p className="text-xs text-text-muted">Tokens saved (24h)</p>
             <p className="text-lg font-semibold">{(cacheMetrics?.tokensSaved ?? 0).toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-xs text-text-muted">Estimated savings (24h)</p>
+            <p className="text-xs text-text-muted">Estimated savings (today)</p>
             <p className="text-lg font-semibold">${(cacheMetrics?.estimatedCostSaved ?? 0).toFixed(4)}</p>
           </div>
           <div>
-            <p className="text-xs text-text-muted">Cache creation tokens</p>
+            <p className="text-xs text-text-muted">Cache creation tokens (today)</p>
             <p className="text-lg font-semibold">{(cacheMetrics?.cacheCreationTokens ?? 0).toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-xs text-text-muted">Requests preserving markers</p>
+            <p className="text-xs text-text-muted">Requests preserving markers (today)</p>
             <p className="text-lg font-semibold">
               {(cacheMetrics?.preservedRequests ?? 0).toLocaleString()}
-              <span className="text-xs font-normal text-text-muted"> / {(cacheMetrics?.requests ?? 0).toLocaleString()}</span>
+              <span className="text-xs font-normal text-text-muted"> / {(cacheMetrics?.policyRequests ?? 0).toLocaleString()}</span>
             </p>
           </div>
-        </div>
+        </div>}
       </Card>
 
       <Modal

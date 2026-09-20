@@ -126,7 +126,6 @@ export async function recordCacheUsage({ provider, model, preserved, tokens } = 
   if (cachedTokens > 0) {
     try {
       const { getPricingForModel } = await import("@/lib/db/repos/pricingRepo.js");
-      const { calculateCostFromTokens } = await import("open-sse/providers/pricing.js");
       const pricing = await getPricingForModel(provider, model);
       if (pricing?.cached != null) {
         costSaved = cachedTokens * ((pricing.input - pricing.cached) / 1_000_000);

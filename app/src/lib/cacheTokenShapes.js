@@ -2,13 +2,13 @@
 export function extractCacheTokenCounts(tokens = {}) {
   return {
     cachedTokens: tokens.cached_tokens
-      || tokens.cache_read_input_tokens
-      || tokens.input_tokens_details?.cached_tokens
-      || tokens.prompt_tokens_details?.cached_tokens
-      || 0,
+      ?? tokens.cache_read_input_tokens
+      ?? tokens.input_tokens_details?.cached_tokens
+      ?? tokens.prompt_tokens_details?.cached_tokens
+      ?? 0,
     cacheCreationTokens: tokens.cache_creation_input_tokens
-      || tokens.input_tokens_details?.cache_creation_tokens
-      || tokens.prompt_tokens_details?.cache_creation_tokens
-      || 0,
+      ?? tokens.input_tokens_details?.cache_creation_tokens
+      ?? tokens.prompt_tokens_details?.cache_creation_tokens
+      ?? 0,
   };
 }

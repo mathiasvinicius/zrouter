@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { extractCacheTokenCounts } from "../../src/lib/cacheTokenShapes.js";
 
 describe("cache metrics token shapes", () => {
+  it("preserves authoritative zero counters", () => {
+    expect(extractCacheTokenCounts({
+      cached_tokens: 0,
+      cache_read_input_tokens: 99,
+      cache_creation_input_tokens: 0,
+      input_tokens_details: { cached_tokens: 999, cache_creation_tokens: 88 },
+    })).toEqual({ cachedTokens: 0, cacheCreationTokens: 0 });
+  });
   it("reads OpenAI Responses nested cached tokens", () => {
     expect(extractCacheTokenCounts({
       input_tokens_details: { cached_tokens: 1234, cache_creation_tokens: 56 },
