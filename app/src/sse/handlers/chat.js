@@ -105,7 +105,8 @@ export async function handleChat(request, clientRawRequest = null) {
       id: profile.id,
       name: profile.name,
       globalInstructions: settings.globalInstructions || "",
-      soul: profile.soul,
+      // Global operational rules are separate; at most one per-key SOUL is injected.
+      soul: profile.soul || "",
       bankId: profile.hindsightBankId,
       mentalModelId: profile.mentalModelId,
       mentalModel,

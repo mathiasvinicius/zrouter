@@ -8,7 +8,7 @@ vi.mock("open-sse/sources/index.js", () => ({
   searchSources: (...args) => searchSources(...args),
 }));
 
-const { recallSourcesForKey, sourcesQueryFromBody } = await import("@/lib/sources/context.js");
+const { recallSourcesForKey, sourcesQueryFromBody, enabledSourceOrigins } = await import("@/lib/sources/context.js");
 const { promptFor } = await import("open-sse/rtk/identity.js");
 
 const KEY = {
@@ -65,6 +65,25 @@ describe("sources recall — timeout and fail-open", () => {
   it("clamps the limit and the timeout to their documented ranges", async () => {
     searchSources.mockResolvedValue([]);
     await recallSourcesForKey(KEY, "zenith", { sourcesRecallLimit: 999, sourcesRecallTimeoutMs: 0 });
-    expect(searchSources).toHaveBeenCalledWith(KEY, "zenith", null, 20);
+    expect(searchSources).toHaveBeenCalledWith(
+      expect.objectContaining({ id: KEY.id }), "zenith", null, 20, expect.any(Object),
+    );
+  });
+
+  it("does not query the same Neo4j bank as memory a second time", () => {
+    const key = {
+      id: "eve", memoryEnabled: true, hindsightBankId: "eve",
+      sources: { neo4j: { enabled: true, banks: ["eve", "shared"] } },
+    };
+    expect(enabledSourceOrigins(key)).toEqual(["neo4j"]);
+    expect(enabledSourceOrigins({ ...key, sources: { neo4j: { enabled: true, banks: ["eve"] } } })).toEqual([]);
+  });
+
+  it("reuses an identical source recall instead of querying the backend twice", async () => {
+    searchSources.mockResolvedValue([{ sourceId: "open-notebook:1" }]);
+    const query = "cache-source-query-unique";
+    await recallSourcesForKey(KEY, query, { sourcesRecallLimit: 6 });
+    await recallSourcesForKey(KEY, query, { sourcesRecallLimit: 6 });
+    expect(searchSources).toHaveBeenCalledTimes(1);
   });
 });

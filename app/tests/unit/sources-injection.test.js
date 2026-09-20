@@ -14,10 +14,21 @@ const item = (over = {}) => ({
 const base = { id: "key-1", bankId: "eve", soul: "Soul text" };
 
 describe("ZROUTER_SOURCES block", () => {
+  it("keeps global rules first and injects only the one selected key SOUL", () => {
+    const prompt = promptFor({ id: "eve", globalInstructions: "GLOBAL RULES", soul: "EVE SOUL" });
+    expect(prompt.indexOf("ZROUTER_GLOBAL")).toBeLessThan(prompt.indexOf("ZROUTER_SOUL:eve"));
+    expect(prompt.match(/ZROUTER_SOUL/g)).toHaveLength(1);
+  });
+
   it("emits no sources block when the key has no excerpts", () => {
     const prompt = promptFor({ ...base, sources: [] });
     expect(prompt).not.toContain("ZROUTER_SOURCES");
     expect(prompt).toContain("<!-- ZROUTER_SOUL:key-1 -->");
+  });
+
+  it("does not emit a boilerplate memory block when recall found nothing", () => {
+    const prompt = promptFor({ ...base, memory: "" });
+    expect(prompt).not.toContain("ZROUTER_MEMORY");
   });
 
   it("emits the block with the marker (and origins) when a source returned excerpts", () => {

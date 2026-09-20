@@ -16,6 +16,9 @@ export const DEFAULT_SOURCES_RECALL_TIMEOUT_MS = 2500;
 export const MAX_SOURCES_RECALL_TIMEOUT_MS = 30000;
 export const DEFAULT_SOURCES_RECALL_MAX_CHARS = 4000;
 export const MAX_SOURCES_RECALL_MAX_CHARS = 20000;
+const SOURCES_CACHE_TTL_MS = 60_000;
+const SOURCES_CACHE_MAX = 256;
+const recallCache = new Map();
 
 function bounded(value, fallback, min, max) {
   const number = Number(value);
@@ -44,8 +47,24 @@ export function sourcesQueryFromBody(body) {
 }
 
 // Only the origins this key enabled, in registry order.
+export function effectiveSourcesRow(apiKeyRow) {
+  const raw = typeof apiKeyRow?.sources === "string"
+    ? (() => { try { return JSON.parse(apiKeyRow.sources); } catch { return {}; } })()
+    : structuredClone(apiKeyRow?.sources || {});
+  const memoryBank = apiKeyRow?.memoryEnabled && apiKeyRow?.hindsightBankId
+    ? String(apiKeyRow.hindsightBankId)
+    : "";
+  const neo4j = raw?.neo4j;
+  if (memoryBank && neo4j?.enabled && Array.isArray(neo4j.banks)) {
+    neo4j.banks = neo4j.banks.map(String).filter((bank) => bank !== memoryBank);
+    if (neo4j.banks.length === 0) neo4j.enabled = false;
+  }
+  return { ...apiKeyRow, sources: raw };
+}
+
 export function enabledSourceOrigins(apiKeyRow) {
-  return SOURCE_ORIGINS.filter((origin) => isSourceEnabled(apiKeyRow, origin));
+  const effective = effectiveSourcesRow(apiKeyRow);
+  return SOURCE_ORIGINS.filter((origin) => isSourceEnabled(effective, origin));
 }
 
 /**
@@ -53,26 +72,48 @@ export function enabledSourceOrigins(apiKeyRow) {
  * @returns {Promise<object[]>} ranked items, or [] on timeout/error/no source enabled.
  */
 export async function recallSourcesForKey(apiKeyRow, query, settings) {
-  const origins = enabledSourceOrigins(apiKeyRow);
+  const effectiveRow = effectiveSourcesRow(apiKeyRow);
+  const origins = SOURCE_ORIGINS.filter((origin) => isSourceEnabled(effectiveRow, origin));
   if (origins.length === 0) return [];
   if (!String(query || "").trim()) return [];
   const timeoutMs = sourcesRecallTimeoutMs(settings);
+  const cacheKey = JSON.stringify([
+    apiKeyRow?.id || "", effectiveRow.sources, String(query).trim(), sourcesRecallLimit(settings),
+  ]);
+  const now = Date.now();
+  for (const [key, cached] of recallCache) {
+    if (cached.expiresAt <= now) recallCache.delete(key);
+  }
+  const cached = recallCache.get(cacheKey);
+  if (cached) {
+    try { return await cached.value; } catch { return []; }
+  }
+  const controller = new AbortController();
   let timer = null;
   try {
-    const results = await Promise.race([
-      searchSources(apiKeyRow, query, null, sourcesRecallLimit(settings)),
-      new Promise((resolve) => {
-        timer = setTimeout(() => resolve(null), timeoutMs);
+    const pending = searchSources(
+      effectiveRow, query, null, sourcesRecallLimit(settings), { signal: controller.signal },
+    ).then((results) => Array.isArray(results) ? results : []);
+    const bounded = Promise.race([
+      pending,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort(new Error("sources recall timeout"));
+          reject(new Error("sources recall timeout"));
+        }, timeoutMs);
         timer.unref?.();
       }),
     ]);
-    if (results === null) {
-      warn("recall-timeout", { timeoutMs, origins });
-      return [];
-    }
-    return Array.isArray(results) ? results : [];
+    recallCache.set(cacheKey, { expiresAt: now + SOURCES_CACHE_TTL_MS, value: bounded });
+    while (recallCache.size > SOURCES_CACHE_MAX) recallCache.delete(recallCache.keys().next().value);
+    return await bounded;
   } catch (error) {
-    warn("recall-failed", { origins, error: String(error?.message || error).slice(0, 200) });
+    recallCache.delete(cacheKey);
+    const timeout = controller.signal.aborted;
+    warn(timeout ? "recall-timeout" : "recall-failed", {
+      origins,
+      ...(timeout ? { timeoutMs } : { error: String(error?.message || error).slice(0, 200) }),
+    });
     return [];
   } finally {
     if (timer) clearTimeout(timer);

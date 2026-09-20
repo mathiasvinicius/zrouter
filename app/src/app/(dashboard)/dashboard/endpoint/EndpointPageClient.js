@@ -25,6 +25,12 @@ function effectiveMemoryBackend(profile, globalBackend) {
   return profile?.memoryBackend || globalBackend || "neo4j";
 }
 
+function selectedSoulId(content, souls) {
+  const value = String(content || "").trim();
+  if (!value) return "";
+  return souls.find((soul) => soul.content.trim() === value)?.id || "__custom__";
+}
+
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [combos, setCombos] = useState([]);
@@ -47,6 +53,7 @@ export default function APIPageClient({ machineId }) {
   const [tunnelDashboardAccess, setTunnelDashboardAccess] = useState(false);
   const [globalInstructions, setGlobalInstructions] = useState("");
   const [globalInstructionsStatus, setGlobalInstructionsStatus] = useState("");
+  const [souls, setSouls] = useState([]);
   const [globalMemoryBackend, setGlobalMemoryBackend] = useState("neo4j");
 
  // Cloudflare Tunnel state
@@ -215,9 +222,10 @@ export default function APIPageClient({ machineId }) {
   const loadSettings = async () => {
     setTunnelChecking(true);
     try {
-      const [settingsRes, statusRes] = await Promise.all([
+      const [settingsRes, statusRes, soulsRes] = await Promise.all([
         fetch("/api/settings"),
-        fetch("/api/tunnel/status", { cache: "no-store" })
+        fetch("/api/tunnel/status", { cache: "no-store" }),
+        fetch("/api/souls", { cache: "no-store" }),
       ]);
       if (settingsRes.ok) {
         const data = await settingsRes.json();
@@ -227,6 +235,10 @@ export default function APIPageClient({ machineId }) {
         setTunnelDashboardAccess(data.tunnelDashboardAccess || false);
         setGlobalInstructions(data.globalInstructions || "");
         setGlobalMemoryBackend(data.memoryBackend || "neo4j");
+      }
+      if (soulsRes.ok) {
+        const data = await soulsRes.json();
+        setSouls(data.souls || []);
       }
       if (statusRes.ok) {
         const data = await statusRes.json();
@@ -1048,16 +1060,15 @@ export default function APIPageClient({ machineId }) {
         )}
       </Card>
 
-      {/* Instructions common to every identity-aware API key */}
+      {/* Operational rules common to every identity-aware API key */}
       <Card>
         <div className="mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">policy</span>
-            Global Identity & Memory Instructions
+            Regras globais de memória e fontes
           </h2>
           <p className="mt-1 text-sm text-text-muted">
-            Applied to every non-service API key before its SOUL.md, mental model and recalled memories.
-            Keep profile-specific personality and private data in each key&apos;s SOUL.md.
+            Aplicadas primeiro a toda chave de usuário. Depois, a chave recebe no máximo um SOUL.md individual escolhido em seu menu.
           </p>
         </div>
         <textarea
@@ -1068,7 +1079,7 @@ export default function APIPageClient({ machineId }) {
             setGlobalInstructionsStatus("");
           }}
           maxLength={20000}
-          placeholder="Shared rules for identity, memory retrieval and tool usage"
+          placeholder="Regras compartilhadas para memória, fontes e ferramentas"
         />
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-xs text-text-muted">
@@ -1076,7 +1087,7 @@ export default function APIPageClient({ machineId }) {
             {globalInstructionsStatus ? ` · ${globalInstructionsStatus}` : ""}
           </p>
           <Button onClick={handleSaveGlobalInstructions} icon="save">
-            Save global instructions
+            Salvar regras globais
           </Button>
         </div>
       </Card>
@@ -1264,12 +1275,27 @@ export default function APIPageClient({ machineId }) {
             </select>
           </label>
           <label className="text-sm font-medium">
-            SOUL.md
+            SOUL ativo
+            <select
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2"
+              value={selectedSoulId(profileForm.soul, souls)}
+              onChange={(event) => {
+                const selected = souls.find((soul) => soul.id === event.target.value);
+                setProfileForm((value) => ({
+                  ...value,
+                  soul: event.target.value === "" ? "" : selected?.content || value.soul,
+                }));
+              }}
+            >
+              <option value="">Sem SOUL individual</option>
+              {souls.map((soul) => <option key={soul.id} value={soul.id}>{soul.name}</option>)}
+              <option value="__custom__">Personalizado</option>
+            </select>
             <textarea
               className="mt-1 min-h-48 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm"
               value={profileForm.soul}
               onChange={(event) => setProfileForm((value) => ({ ...value, soul: event.target.value }))}
-              placeholder="Personality, values, style and permanent instructions"
+              placeholder="Escolha um agente acima ou escreva um SOUL individual personalizado."
             />
           </label>
           <label className="flex items-center gap-3 text-sm">
@@ -1335,10 +1361,26 @@ export default function APIPageClient({ machineId }) {
             </select>
           </label>
           <label className="text-sm font-medium">
-            SOUL.md
+            SOUL ativo
+            <select
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2"
+              value={selectedSoulId(editingKey.soul, souls)}
+              onChange={(event) => {
+                const selected = souls.find((soul) => soul.id === event.target.value);
+                setEditingKey((value) => ({
+                  ...value,
+                  soul: event.target.value === "" ? "" : selected?.content || value.soul,
+                }));
+              }}
+            >
+              <option value="">Sem SOUL individual</option>
+              {souls.map((soul) => <option key={soul.id} value={soul.id}>{soul.name}</option>)}
+              <option value="__custom__">Personalizado</option>
+            </select>
             <textarea className="mt-1 min-h-64 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm"
               value={editingKey.soul || ""}
-              onChange={(event) => setEditingKey((value) => ({ ...value, soul: event.target.value }))} />
+              onChange={(event) => setEditingKey((value) => ({ ...value, soul: event.target.value }))}
+              placeholder="Escolha um agente acima ou escreva um SOUL individual personalizado." />
           </label>
           <label className="flex items-center gap-3 text-sm">
             <input type="checkbox" checked={editingKey.memoryEnabled !== false}

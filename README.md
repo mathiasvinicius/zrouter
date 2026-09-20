@@ -27,6 +27,9 @@ tokens e isolamento de conhecimento por chave de API.
 - **Fontes de conhecimento por API key** — vincule notebooks do Open Notebook, páginas do
   Notion (somente leitura) e banks de memória do Neo4j a cada chave. O que a chave não pode
   ver, ela não recebe; com injeção de contexto citável e rastreável à fonte.
+- **Identidade sem conflito** — regras globais de memória/fontes entram primeiro; depois cada
+  chave injeta no máximo um `SOUL.md`, escolhido no menu a partir das minds disponíveis ou
+  editado como perfil personalizado.
 - **Inteligência de provedores** — descoberta e importação de modelos via `/models` upstream,
   sincronização automática, cotas em tempo real, saúde e análise de custo por conexão.
 - **Model Context Protocol** — 33+ ferramentas MCP prontas (Open Notebook, Notion, busca web, TTS).
@@ -118,8 +121,9 @@ O Neo4j é o **único** backend de memória de identidade (o Hindsight foi remov
 | Biblioteca documental (Open Notebook) | `open-notebook` + `surrealdb` | `bundled` | 5055 / 8502 |
 | Notion (read-only) | — externo — | — | API pública |
 
-Embeddings locais via Ollama (`bge-m3`) são recomendados para busca semântica no Open
-Notebook, mas o gateway funciona sem eles.
+O recall síncrono do gateway usa a busca textual local e escopada do Open Notebook para não
+chamar um modelo de embedding em cada chat. Embeddings continuam úteis dentro do próprio
+Open Notebook para suas buscas semânticas e fluxos de ingestão.
 
 ## Origens & Créditos
 

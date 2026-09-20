@@ -1,14 +1,14 @@
 // Per-source connection status — used by the key modal "Testar conexão" and the
 // Fontes page. No credential values ever leave this module; only booleans/latency.
 
-import { isNotionConfigured } from "./notionBackend.js";
+import { isNotionConfigured, probeNotionConnection } from "./notionBackend.js";
 import { isOpenNotebookConfigured } from "./openNotebookBackend.js";
 import { isNeo4jConfigured } from "./neo4jBackend.js";
 
 // A status probe is a cheap reachability/config check per origin.
 async function probeNotion() {
   if (!isNotionConfigured()) return { configured: false, ok: false, status: "not-configured" };
-  // Real token exists → a real probe arrives with the Notion integration.
+  await probeNotionConnection();
   return { configured: true, ok: true, status: "ok" };
 }
 

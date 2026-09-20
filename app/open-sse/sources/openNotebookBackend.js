@@ -1,16 +1,13 @@
 // Open Notebook backend — REST at http://127.0.0.1:5055 (roadmap item 3).
 //
-// POST /api/search {"query": q, "type": "vector", "limit": N}
+// POST /api/search {"query": q, "type": "text", "limit": N, "notebook_ids": [...]}
 // Results are filtered by the key's authorized notebook IDs BEFORE returning.
 // 10s timeout; errors → empty list + structured log without credentials.
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:5055";
-// The Open Notebook /api/search runs an embedding + vector query; a cold search
-// measured 48.5s on this deployment (first call after idle). 10s aborted every
-// real search. Keep a generous ceiling — the caller (sources/context.js) imposes
-// its own sourcesRecallTimeoutMs budget and fails open, so a slow source never
-// blocks inference; this only bounds the individual HTTP call.
-const SEARCH_TIMEOUT_MS = 90_000;
+// Text search is local and normally completes in milliseconds. The caller still
+// imposes the tighter per-request recall budget and propagates cancellation.
+const SEARCH_TIMEOUT_MS = 10_000;
 
 function baseUrl() {
   return String(process.env.OPEN_NOTEBOOK_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
@@ -36,6 +33,11 @@ export function isOpenNotebookConfigured() {
   return Boolean(password());
 }
 
+function requestSignal(signal, timeoutMs) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
 async function openNotebookFetch(path, options = {}) {
   const response = await fetch(`${baseUrl()}${path}`, {
     ...options,
@@ -44,7 +46,7 @@ async function openNotebookFetch(path, options = {}) {
       Authorization: `Bearer ${password()}`,
       ...(options.headers || {}),
     },
-    signal: AbortSignal.timeout(options.timeoutMs || SEARCH_TIMEOUT_MS),
+    signal: requestSignal(options.signal, options.timeoutMs || SEARCH_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new Error(`Open Notebook ${path} failed (${response.status})`);
@@ -57,22 +59,35 @@ function excerptFrom(result) {
   return matches.filter((m) => typeof m === "string").join("\n").slice(0, 2000);
 }
 
-export async function searchOpenNotebook(query, entry, limit = 10) {
+export async function searchOpenNotebook(query, entry, limit = 10, options = {}) {
   if (!isOpenNotebookConfigured()) return [];
   const { allowAll, allowed } = notebookScope(entry);
   if (!allowAll && allowed.size === 0) return [];
   const payload = await openNotebookFetch("/api/search", {
     method: "POST",
-    body: JSON.stringify({ query, type: "vector", limit: Math.min(100, limit * 4) }),
+    body: JSON.stringify({
+      query,
+      type: "text",
+      limit: Math.min(100, limit * 2),
+      search_sources: true,
+      search_notes: false,
+      ...(!allowAll ? { notebook_ids: [...allowed] } : {}),
+    }),
+    signal: options.signal,
   });
   const results = Array.isArray(payload?.results) ? payload.results : [];
-  // The upstream search is global: authorization filtering happens here, on our side.
+  // The upstream search enforces notebook_ids. We still verify the returned source
+  // metadata as defense in depth and use it to obtain a useful excerpt.
   const sources = await Promise.all(results.map(async (result) => {
     const sourceId = result?.id || result?.parent_id;
     if (!sourceId) return null;
     let notebooks = null;
+    let source = null;
     try {
-      const source = await openNotebookFetch(`/api/sources/${encodeURIComponent(sourceId)}`, { timeoutMs: 5000 });
+      source = await openNotebookFetch(`/api/sources/${encodeURIComponent(sourceId)}`, {
+        timeoutMs: 5000,
+        signal: options.signal,
+      });
       notebooks = Array.isArray(source?.notebooks) ? source.notebooks : [];
     } catch {
       // Source details unavailable → treat as unscoped and drop it (fail-closed).
@@ -85,10 +100,11 @@ export async function searchOpenNotebook(query, entry, limit = 10) {
       sourceId: `open-notebook:${sourceId}`,
       title: result.title || "",
       url: "",
-      excerpt: excerptFrom(result),
+      excerpt: excerptFrom(result) || String(source?.full_text || "").slice(0, 2000),
       updatedAt: null,
       bank: scoped[0] || notebooks[0] || "",
-      score: typeof result.similarity === "number" ? result.similarity : 0,
+      score: typeof result.similarity === "number" ? result.similarity
+        : typeof result.relevance === "number" ? result.relevance : 0,
     };
   }));
   return sources.filter(Boolean).slice(0, limit);

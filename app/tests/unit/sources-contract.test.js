@@ -93,6 +93,7 @@ describe("sources contract", () => {
       "zenith",
       expect.objectContaining({ enabled: true, notebooks: ["notebook:allowed"] }),
       10,
+      expect.any(Object),
     );
     expect(neo4jSearch).not.toHaveBeenCalled();
     expect(notionSearch).not.toHaveBeenCalled();
@@ -160,6 +161,6 @@ describe("sources contract", () => {
 
   it("limit is clamped to a sane ceiling", async () => {
     await searchSources(KEY_ALL, "q", null, 9999);
-    expect(openNotebookSearch).toHaveBeenCalledWith("q", expect.anything(), 50);
+    expect(openNotebookSearch).toHaveBeenCalledWith("q", expect.anything(), 50, expect.any(Object));
   });
 });

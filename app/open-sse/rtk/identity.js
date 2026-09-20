@@ -67,10 +67,8 @@ export function promptFor(context) {
   if (context?.mentalModel?.trim()) {
     parts.push(`<!-- ZROUTER_MENTAL_MODEL:${context.mentalModelId || "default"} -->\nCurrent synthesized profile:\n${context.mentalModel.trim()}`);
   }
-  if (context?.bankId) {
-    const memory = context?.memory?.trim()
-      || "No relevant long-term memory was retrieved for the current query.";
-    parts.push(`<!-- ZROUTER_MEMORY:${context.bankId} -->\nRouter-managed recall result for the current query:\n${memory}`);
+  if (context?.bankId && context?.memory?.trim()) {
+    parts.push(`<!-- ZROUTER_MEMORY:${context.bankId} -->\nRouter-managed recall result for the current query:\n${context.memory.trim()}`);
   }
   const sources = sourcesBlock(context);
   if (sources) parts.push(sources);

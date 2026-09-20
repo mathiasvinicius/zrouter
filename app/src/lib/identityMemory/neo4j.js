@@ -17,6 +17,7 @@ const STOPWORDS = new Set([
 ]);
 
 const recallCache = new Map();
+const mentalModelCache = new Map();
 const retainedMessages = new Map();
 
 function numberFromEnv(name, fallback, min, max = Number.MAX_SAFE_INTEGER) {
@@ -186,17 +187,29 @@ export async function ensureMentalModel(bankId, mentalModelId) {
 
 export async function mentalModelForProfile(profile) {
   if (!profile?.memoryEnabled || !profile?.hindsightBankId || !profile?.mentalModelId) return "";
-  try {
-    const bank = validateBankId(profile.hindsightBankId);
-    const results = await execute([statement(
-      "MATCH (mm:MentalModel {bank: $bank, id: $id}) RETURN mm.content LIMIT 1",
-      { bank, id: String(profile.mentalModelId) },
-    )], 4000);
-    return String(rows(results[0])[0]?.[0] || "");
-  } catch (error) {
-    console.warn(`[IdentityMemory][neo4j] mental model lookup failed: ${error.message}`);
-    return "";
-  }
+  const key = `${profile.hindsightBankId}\0${profile.mentalModelId}`;
+  const now = Date.now();
+  pruneCache(mentalModelCache, now);
+  const cached = mentalModelCache.get(key);
+  if (cached?.expiresAt > now) return cached.value;
+  const value = (async () => {
+    try {
+      const bank = validateBankId(profile.hindsightBankId);
+      const results = await execute([statement(
+        "MATCH (mm:MentalModel {bank: $bank, id: $id}) RETURN mm.content LIMIT 1",
+        { bank, id: String(profile.mentalModelId) },
+      )], 4000);
+      return String(rows(results[0])[0]?.[0] || "");
+    } catch (error) {
+      console.warn(`[IdentityMemory][neo4j] mental model lookup failed: ${error.message}`);
+      return "";
+    }
+  })();
+  mentalModelCache.set(key, {
+    expiresAt: now + numberFromEnv("NEO4J_MENTAL_MODEL_TTL_MS", DEFAULT_RECALL_DEDUP_TTL_MS, 0),
+    value,
+  });
+  return value;
 }
 
 export async function recallForProfile(profile, body) {

@@ -107,7 +107,7 @@ function dedupeBySourceId(items) {
   });
 }
 
-export async function searchSources(apiKeyRow, query, scope, limit = 10) {
+export async function searchSources(apiKeyRow, query, scope, limit = 10, options = {}) {
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
   const config = parseSourcesConfig(apiKeyRow?.sources);
   const origins = resolveRequestedOrigins(apiKeyRow, scope);
@@ -117,7 +117,7 @@ export async function searchSources(apiKeyRow, query, scope, limit = 10) {
   const searches = origins.map(async (origin) => {
     const entry = sourceEntry(config, origin);
     try {
-      const results = await BACKENDS[origin].search(searchables, entry, safeLimit);
+      const results = await BACKENDS[origin].search(searchables, entry, safeLimit, options);
       return (Array.isArray(results) ? results : []).map((item) => normalizeResult(origin, item));
     } catch (error) {
       // Fail-open per backend: one broken source never kills the whole search.

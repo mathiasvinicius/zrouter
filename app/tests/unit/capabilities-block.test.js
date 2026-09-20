@@ -65,6 +65,7 @@ describe("ZROUTER_CAPABILITIES block", () => {
     const prompt = promptFor({
       id: "key-1",
       bankId: "eve",
+      memory: "A relevant memory.",
       capabilities,
       sources: [{ sourceId: "open-notebook:source:1", origin: "open-notebook", title: "T", excerpt: "excerpt" }],
     });

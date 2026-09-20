@@ -38,8 +38,10 @@ services:
       NEO4J_USER: ${NEO4J_USER:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
       OPEN_NOTEBOOK_URL: ${OPEN_NOTEBOOK_URL:-http://127.0.0.1:5055}
+      ZROUTER_SOULS_DIR: /opt/zion/minds
     volumes:
       - ./data:/app/data
+      - /opt/zion/minds:/opt/zion/minds:ro
     depends_on:
       neo4j:
         condition: service_started

@@ -70,6 +70,7 @@ describe("open-notebook notebook scope", () => {
     expect(ALL_NOTEBOOKS).toBe("*");
     const results = await searchOpenNotebook("doc", { enabled: true, notebooks: [ALL_NOTEBOOKS] }, 10);
     expect(results.map((r) => r.sourceId).sort()).toEqual(["open-notebook:source:1", "open-notebook:source:2"]);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
     expect(await getOpenNotebookSource("source:2", { enabled: true, notebooks: [ALL_NOTEBOOKS] })).not.toBeNull();
   });
 
@@ -82,5 +83,16 @@ describe("open-notebook notebook scope", () => {
 
   it("an unauthorized notebook id returns nothing", async () => {
     expect(await searchOpenNotebook("doc", { enabled: true, notebooks: ["notebook:nope"] }, 10)).toEqual([]);
+  });
+
+  it("uses source full_text when text search returns no vector matches", async () => {
+    global.fetch.mockImplementationOnce(async () => ({
+      ok: true, status: 200, json: async () => ({ results: [
+        { id: "source:1", title: "Doc do caderno A", relevance: 4.2 },
+      ] }),
+    }));
+    const results = await searchOpenNotebook("conteudo", { enabled: true, notebooks: [NOTEBOOK_A] }, 10);
+    expect(results[0].excerpt).toBe("conteudo A");
+    expect(results[0].score).toBe(4.2);
   });
 });
