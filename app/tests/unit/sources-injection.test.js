@@ -115,6 +115,34 @@ describe("ZROUTER_SOURCES block", () => {
     expect(body.messages[0].content.match(/ZROUTER_SOURCES/g)).toHaveLength(1);
   });
 
+  it("keeps the agent-provided SOUL and skips the per-key fallback SOUL", async () => {
+    const { injectIdentity, bodyHasAgentSoul } = await import("open-sse/rtk/identity.js");
+    const body = {
+      messages: [
+        { role: "system", content: "# FILE: /opt/zion/minds/eve/prompts/SOUL.md\n# SOUL.md — Who I Am\nEVE" },
+        { role: "user", content: "oi" },
+      ],
+    };
+    expect(bodyHasAgentSoul(body)).toBe(true);
+    expect(injectIdentity(body, "openai", {
+      id: "key-1", globalInstructions: "GLOBAL RULES", soul: "KEY FALLBACK SOUL",
+    })).toBe(true);
+    expect(body.messages[0].content).toContain("GLOBAL RULES");
+    expect(body.messages[0].content).not.toContain("ZROUTER_SOUL");
+    expect(body.messages[0].content).not.toContain("KEY FALLBACK SOUL");
+  });
+
+  it("injects the per-key SOUL when the client has no agent SOUL", async () => {
+    const { injectIdentity } = await import("open-sse/rtk/identity.js");
+    const body = { messages: [{ role: "user", content: "oi" }] };
+    expect(injectIdentity(body, "openai", {
+      id: "key-1", globalInstructions: "GLOBAL RULES", soul: "KEY FALLBACK SOUL",
+    })).toBe(true);
+    expect(body.messages[0].content).toContain("ZROUTER_GLOBAL");
+    expect(body.messages[0].content).toContain("ZROUTER_SOUL:key-1");
+    expect(body.messages[0].content).toContain("KEY FALLBACK SOUL");
+  });
+
   it("is not emitted for a service key (no identityContext at all)", () => {
     expect(promptFor(null)).toBe("");
   });

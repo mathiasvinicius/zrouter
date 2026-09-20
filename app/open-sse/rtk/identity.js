@@ -77,8 +77,37 @@ export function promptFor(context) {
   return parts.length ? `${MARKER}\n${parts.join(SEPARATOR)}` : "";
 }
 
+function contentText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part) => typeof part === "string" ? part : part?.text || "").join("\n");
+}
+
+// Agent runtimes such as Zenith/Hermes already send their own SOUL.md inside
+// the system prompt. In that case the agent identity wins and the per-key SOUL
+// remains a fallback for clients that do not carry one.
+export function bodyHasAgentSoul(body) {
+  if (!body || typeof body !== "object") return false;
+  const request = body.request && typeof body.request === "object" ? body.request : body;
+  const systemInstruction = request.system_instruction || request.systemInstruction;
+  const texts = [
+    contentText(body.instructions),
+    contentText(body.system),
+    contentText(systemInstruction?.parts),
+    ...(Array.isArray(body.messages) ? body.messages
+      .filter((message) => ["system", "developer"].includes(message?.role))
+      .map((message) => contentText(message.content)) : []),
+    ...(Array.isArray(body.input) ? body.input
+      .filter((message) => ["system", "developer"].includes(message?.role))
+      .map((message) => contentText(message.content)) : []),
+  ];
+  const marker = /(?:^|\n)\s*#{1,3}\s*(?:FILE:\s*[^\n]*\/)?SOUL\.md\b|<!--\s*(?:ZROUTER_)?SOUL\b/im;
+  return texts.some((text) => marker.test(text));
+}
+
 export function injectIdentity(body, format, context) {
-  const prompt = promptFor(context);
+  const effectiveContext = bodyHasAgentSoul(body) ? { ...context, soul: "" } : context;
+  const prompt = promptFor(effectiveContext);
   if (!prompt || !body || typeof body !== "object") return false;
   const serialized = JSON.stringify(body);
   if (serialized.includes(MARKER)) return false;

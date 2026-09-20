@@ -25,12 +25,6 @@ function effectiveMemoryBackend(profile, globalBackend) {
   return profile?.memoryBackend || globalBackend || "neo4j";
 }
 
-function selectedSoulId(content, souls) {
-  const value = String(content || "").trim();
-  if (!value) return "";
-  return souls.find((soul) => soul.content.trim() === value)?.id || "__custom__";
-}
-
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [combos, setCombos] = useState([]);
@@ -53,7 +47,6 @@ export default function APIPageClient({ machineId }) {
   const [tunnelDashboardAccess, setTunnelDashboardAccess] = useState(false);
   const [globalInstructions, setGlobalInstructions] = useState("");
   const [globalInstructionsStatus, setGlobalInstructionsStatus] = useState("");
-  const [souls, setSouls] = useState([]);
   const [globalMemoryBackend, setGlobalMemoryBackend] = useState("neo4j");
 
  // Cloudflare Tunnel state
@@ -222,10 +215,9 @@ export default function APIPageClient({ machineId }) {
   const loadSettings = async () => {
     setTunnelChecking(true);
     try {
-      const [settingsRes, statusRes, soulsRes] = await Promise.all([
+      const [settingsRes, statusRes] = await Promise.all([
         fetch("/api/settings"),
         fetch("/api/tunnel/status", { cache: "no-store" }),
-        fetch("/api/souls", { cache: "no-store" }),
       ]);
       if (settingsRes.ok) {
         const data = await settingsRes.json();
@@ -235,10 +227,6 @@ export default function APIPageClient({ machineId }) {
         setTunnelDashboardAccess(data.tunnelDashboardAccess || false);
         setGlobalInstructions(data.globalInstructions || "");
         setGlobalMemoryBackend(data.memoryBackend || "neo4j");
-      }
-      if (soulsRes.ok) {
-        const data = await soulsRes.json();
-        setSouls(data.souls || []);
       }
       if (statusRes.ok) {
         const data = await statusRes.json();
@@ -1275,27 +1263,12 @@ export default function APIPageClient({ machineId }) {
             </select>
           </label>
           <label className="text-sm font-medium">
-            SOUL ativo
-            <select
-              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2"
-              value={selectedSoulId(profileForm.soul, souls)}
-              onChange={(event) => {
-                const selected = souls.find((soul) => soul.id === event.target.value);
-                setProfileForm((value) => ({
-                  ...value,
-                  soul: event.target.value === "" ? "" : selected?.content || value.soul,
-                }));
-              }}
-            >
-              <option value="">Sem SOUL individual</option>
-              {souls.map((soul) => <option key={soul.id} value={soul.id}>{soul.name}</option>)}
-              <option value="__custom__">Personalizado</option>
-            </select>
+            SOUL.md personalizado desta API key
             <textarea
               className="mt-1 min-h-48 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm"
               value={profileForm.soul}
               onChange={(event) => setProfileForm((value) => ({ ...value, soul: event.target.value }))}
-              placeholder="Escolha um agente acima ou escreva um SOUL individual personalizado."
+              placeholder="Fallback de identidade para clientes que não enviam seu próprio SOUL.md."
             />
           </label>
           <label className="flex items-center gap-3 text-sm">
@@ -1361,26 +1334,11 @@ export default function APIPageClient({ machineId }) {
             </select>
           </label>
           <label className="text-sm font-medium">
-            SOUL ativo
-            <select
-              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2"
-              value={selectedSoulId(editingKey.soul, souls)}
-              onChange={(event) => {
-                const selected = souls.find((soul) => soul.id === event.target.value);
-                setEditingKey((value) => ({
-                  ...value,
-                  soul: event.target.value === "" ? "" : selected?.content || value.soul,
-                }));
-              }}
-            >
-              <option value="">Sem SOUL individual</option>
-              {souls.map((soul) => <option key={soul.id} value={soul.id}>{soul.name}</option>)}
-              <option value="__custom__">Personalizado</option>
-            </select>
+            SOUL.md personalizado desta API key
             <textarea className="mt-1 min-h-64 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm"
               value={editingKey.soul || ""}
               onChange={(event) => setEditingKey((value) => ({ ...value, soul: event.target.value }))}
-              placeholder="Escolha um agente acima ou escreva um SOUL individual personalizado." />
+              placeholder="Fallback de identidade para clientes que não enviam seu próprio SOUL.md." />
           </label>
           <label className="flex items-center gap-3 text-sm">
             <input type="checkbox" checked={editingKey.memoryEnabled !== false}
