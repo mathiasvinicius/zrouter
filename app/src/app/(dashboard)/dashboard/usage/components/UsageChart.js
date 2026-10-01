@@ -45,6 +45,8 @@ export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" })
   const [byKey, setByKey] = useState(false);
   const [groups, setGroups] = useState([]);
 
+  const cfg = VIEW_CONFIG[viewMode] || VIEW_CONFIG.tokens;
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -140,8 +142,8 @@ export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" })
                 fontSize: "12px",
               }}
               formatter={(value, name) => {
-                if (byKey) return [viewMode === "tokens" ? fmtTokens(value) : fmtCost(value), name];
-                return name === "tokens" ? [fmtTokens(value), "Tokens"] : [fmtCost(value), "Cost"];
+                if (byKey) return [cfg.formatter(value), name];
+                return [cfg.formatter(value), cfg.label];
               }}
             />
             {byKey ? groups.map((g, i) => (
@@ -156,23 +158,13 @@ export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" })
                 dot={false}
                 activeDot={{ r: 4 }}
               />
-            )) : viewMode === "tokens" ? (
+            )) : (
               <Area
                 type="monotone"
-                dataKey="tokens"
-                stroke="#6366f1"
+                dataKey={cfg.dataKey}
+                stroke={cfg.color}
                 strokeWidth={2}
-                fill="url(#gradTokens)"
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            ) : (
-              <Area
-                type="monotone"
-                dataKey="cost"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                fill="url(#gradCost)"
+                fill={`url(#${cfg.gradId})`}
                 dot={false}
                 activeDot={{ r: 4 }}
               />
