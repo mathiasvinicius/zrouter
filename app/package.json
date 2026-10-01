@@ -1,6 +1,6 @@
 {
   "name": "zrouter-app",
-  "version": "0.5.81",
+  "version": "0.5.95",
   "description": "ZRouter web dashboard",
   "private": true,
   "scripts": {

@@ -86,7 +86,7 @@ describe("migration 004 — memory-backend-neo4j", () => {
     expect(rows["legacy-hindsight"].hindsightBankId).toBe("ViniciusMathias");
     expect(rows["legacy-null"].hindsightBankId).toBe("eve");
 
-    expect(parseInt(db.get(`SELECT value FROM _meta WHERE key='schemaVersion'`).value, 10)).toBe(4);
+    expect(parseInt(db.get(`SELECT value FROM _meta WHERE key='schemaVersion'`).value, 10)).toBe(5);
   });
 
   it("is idempotent across restarts", async () => {
@@ -98,7 +98,7 @@ describe("migration 004 — memory-backend-neo4j", () => {
 
     const db2 = await bootDb();
     expect(backends(db2)).toEqual(before);
-    expect(parseInt(db2.get(`SELECT value FROM _meta WHERE key='schemaVersion'`).value, 10)).toBe(4);
+    expect(parseInt(db2.get(`SELECT value FROM _meta WHERE key='schemaVersion'`).value, 10)).toBe(5);
   });
 
   it("normalizes a memoryBackend: \"hindsight\" registration to neo4j without erroring", async () => {

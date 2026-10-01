@@ -7,6 +7,14 @@ const migration = {
   version: 5,
   name: "dynamic-combos",
   up(db) {
+    // A legacy DB (or a fixture with only the tables it needs) may not have the
+    // combos table yet — creating it is migration 001's job, and re-running this
+    // one must never throw. Skip cleanly instead.
+    const tables = db
+      .all(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'combos'`)
+      .map((row) => row.name);
+    if (!tables.includes("combos")) return;
+
     const columns = db.all(`PRAGMA table_info(combos)`).map((row) => row.name);
     if (!columns.includes("type")) {
       db.exec(`ALTER TABLE combos ADD COLUMN type TEXT NOT NULL DEFAULT 'static'`);

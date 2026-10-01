@@ -23,6 +23,7 @@ const LIMIT_TOLERANCE = 0.1;
 // Providers absent here keep whatever the local pattern table resolves; names
 // that already match are resolved automatically.
 export const PROVIDER_ALIASES = {
+  "github": "github-copilot",
   "glm": "zai",
   "glm-cn": "zhipuai",
   "claude": "anthropic",

@@ -30,8 +30,8 @@ export async function getCustomModels() {
 }
 
 // Atomic upsert inside transaction to prevent duplicate races.
-// Re-adding an existing model updates caps/name without resetting omitted fields.
-export async function addCustomModel({ providerAlias, id, type = "llm", name, caps, source }) {
+// Re-adding an existing model updates caps/name/transport without resetting omitted fields.
+export async function addCustomModel({ providerAlias, id, type = "llm", name, caps, source, transport }) {
   const k = customKey(providerAlias, id, type);
   const db = await getAdapter();
   let added = false;
@@ -42,11 +42,11 @@ export async function addCustomModel({ providerAlias, id, type = "llm", name, ca
       // A stored source ("discovered") is sticky; it can never be overwritten
       // to manual by a later source-less re-add (auto-sync safety contract).
       const nextSource = source !== undefined ? source : (prev.source !== undefined ? prev.source : "manual");
-      const next = { ...prev, ...(name ? { name } : {}), ...(caps ? { caps } : {}), source: nextSource };
+      const next = { ...prev, ...(name ? { name } : {}), ...(caps ? { caps } : {}), ...(transport ? { transport } : {}), source: nextSource };
       db.run(`UPDATE kv SET value = ? WHERE scope = 'customModels' AND key = ?`, [stringifyJson(next), k]);
       return;
     }
-    const value = stringifyJson({ providerAlias, id, type, name: name || id, ...(caps ? { caps } : {}), ...(source !== undefined ? { source } : { source: "manual" }) });
+    const value = stringifyJson({ providerAlias, id, type, name: name || id, ...(caps ? { caps } : {}), ...(transport ? { transport } : {}), ...(source !== undefined ? { source } : { source: "manual" }) });
     db.run(`INSERT INTO kv(scope, key, value) VALUES('customModels', ?, ?)`, [k, value]);
     added = true;
   });

@@ -109,11 +109,13 @@ describe("byApiKey aggregation", () => {
     // No long sk- token survives anywhere in the response.
     expect(payload).not.toMatch(/sk-[A-Za-z0-9._-]{20,}/);
     // Masked prefixes are the only key-derived value allowed through. The mask is
-    // key.slice(0,8) + "***" — the "***" stops it from reading as a full secret.
-    // A mask is key.slice(0, 8) + "***". Every real ZRouter key starts with the
-    // same 12+ machine prefix, so 8 chars identify a machine, not a key.
+    // key.slice(0,8) + "***" + key.slice(-4) — the "***" stops it from reading as
+    // a full secret (28+ chars stay hidden). Every real ZRouter key starts with
+    // the same 12+ machine prefix, so 8 leading chars identify a machine, and the
+    // 4-char tail keeps two keys of one machine from colliding in the UI.
     for (const row of Object.values(stats.byApiKey)) {
-      if (row.apiKeyMasked) expect(row.apiKeyMasked).toMatch(/^sk-[A-Za-z0-9._-]{1,5}\*\*\*$/);
+      if (row.apiKeyMasked) expect(row.apiKeyMasked).toMatch(/^sk-[A-Za-z0-9._-]{1,5}\*\*\*[A-Za-z0-9._-]{1,8}$/);
+      if (row.apiKeyMasked) expect(row.apiKeyMasked).not.toMatch(/^sk-[A-Za-z0-9._-]{20,}$/);
     }
     for (const key of [KEY_EVE, KEY_OCR, KEY_GONE]) {
       expect(key.length).toBeGreaterThan(40);

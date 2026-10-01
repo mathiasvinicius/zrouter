@@ -10,7 +10,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import Card from "@/shared/components/Card";
 
@@ -21,6 +20,19 @@ const fmtTokens = (n) => {
 };
 
 const fmtCost = (n) => `$${(n || 0).toFixed(4)}`;
+const fmtRequests = (n) => String(n || 0);
+
+const VIEW_MODES = [
+  { value: "tokens", label: "Tokens" },
+  { value: "requests", label: "Requests" },
+  { value: "cost", label: "Cost" },
+];
+
+const VIEW_CONFIG = {
+  tokens:   { dataKey: "tokens",   color: "#6366f1", gradId: "gradTokens",   formatter: fmtTokens,   label: "Tokens" },
+  requests: { dataKey: "requests", color: "#14b8a6", gradId: "gradRequests", formatter: fmtRequests, label: "Requests" },
+  cost:     { dataKey: "cost",     color: "#f59e0b", gradId: "gradCost",     formatter: fmtCost,     label: "Cost" },
+};
 
 // Colour per key series. Fixed palette, brand-first, so each key keeps its colour
 // across re-sorts and refreshes (series are ordered by the server payload).
@@ -69,19 +81,19 @@ export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" })
 
   return (
     <Card className="flex min-w-0 flex-col gap-3 p-3 sm:p-4">
-      <div className="grid w-full grid-cols-2 items-center gap-1 rounded-lg border border-border bg-bg-subtle p-1 sm:w-auto sm:self-start">
-        <button
-          onClick={() => setViewMode("tokens")}
-          className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === "tokens" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-        >
-          Tokens
-        </button>
-        <button
-          onClick={() => setViewMode("cost")}
-          className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === "cost" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-        >
-          Cost
-        </button>
+      <div
+        className="grid w-full items-center gap-1 rounded-lg border border-border bg-bg-subtle p-1 sm:w-auto sm:self-start"
+        style={{ gridTemplateColumns: `repeat(${VIEW_MODES.length}, minmax(0, 1fr))` }}
+      >
+        {VIEW_MODES.map((m) => (
+          <button
+            key={m.value}
+            onClick={() => setViewMode(m.value)}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === m.value ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -95,6 +107,10 @@ export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" })
               <linearGradient id="gradTokens" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
                 <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="gradRequests" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradCost" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25} />
@@ -113,7 +129,7 @@ export default function UsageChart({ period = "7d", apiKey = "", groupBy = "" })
               tick={{ fontSize: 10, fill: "currentColor", fillOpacity: 0.5 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={viewMode === "tokens" ? fmtTokens : fmtCost}
+              tickFormatter={cfg.formatter}
               width={50}
             />
             <Tooltip

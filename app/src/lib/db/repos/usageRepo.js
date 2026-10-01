@@ -7,8 +7,9 @@ import { extractCacheTokenCounts } from "@/lib/cacheTokenShapes.js";
 
 function maskApiKey(key) {
   if (!key || typeof key !== "string") return null;
-  if (key.length <= 8) return key.charAt(0) + "***";
-  return key.slice(0, 8) + "***";
+  if (key.length <= 12) return key.charAt(0) + "***";
+  // Keep the tail: keys sharing a machine-id prefix (team keys) must not collide.
+  return key.slice(0, 8) + "***" + key.slice(-4);
 }
 
 // Public identity for a stored apiKey value, never the key itself.
@@ -457,12 +458,12 @@ export async function getUsageHistory(filter = {}) {
 
 function loadDaysInRange(adapter, maxDays) {
   if (maxDays == null) {
-    return adapter.all(`SELECT dateKey, data FROM usageDaily`);
+    return adapter.all(`SELECT dateKey, data FROM usageDaily ORDER BY dateKey ASC`);
   }
   const today = new Date();
   const cutoff = new Date(today.getFullYear(), today.getMonth(), today.getDate() - maxDays + 1);
   const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
-  return adapter.all(`SELECT dateKey, data FROM usageDaily WHERE dateKey >= ?`, [cutoffKey]);
+  return adapter.all(`SELECT dateKey, data FROM usageDaily WHERE dateKey >= ? ORDER BY dateKey ASC`, [cutoffKey]);
 }
 
 export async function getUsageStats(period = "all", options = {}) {
@@ -673,8 +674,15 @@ export async function getUsageStats(period = "all", options = {}) {
       }
     }
 
-    // Overlay precise lastUsed timestamps from history
-    const overlayCutoff = maxDays ? Date.now() - maxDays * 86400000 : 0;
+    // Overlay precise lastUsed timestamps from history.
+    // ponytail: overlay scans only a recent window; entries older than that keep
+    // day-level lastUsed from usageDaily. Upgrade to a materialized per-key
+    // MAX(timestamp) table if exact old timestamps ever matter.
+    const OVERLAY_WINDOW_MS = 2 * 86400000;
+    const overlayCutoff = Math.max(
+      maxDays ? Date.now() - maxDays * 86400000 : 0,
+      Date.now() - OVERLAY_WINDOW_MS
+    );
     const histRows = db.all(
       `SELECT timestamp, provider, model, connectionId, apiKey, endpoint FROM usageHistory WHERE timestamp >= ?`,
       [new Date(overlayCutoff).toISOString()]
@@ -804,8 +812,33 @@ export async function getChartData(period = "7d", options = {}) {
   };
   const byApiKey = groupBy === "apiKey";
 
-  // Bucket geometry: today → 24 hourly buckets from midnight; 24h → last 24h;
-  // 7d/30d → one bucket per day (local date, like usageDaily).
+  // "all": one bucket per calendar day, from the earliest day on record.
+  if (period === "all" && !byApiKey) {
+    const dayRows = loadDaysInRange(db, null);
+    if (!dayRows.length) return [];
+    const dayMap = {};
+    for (const r of dayRows) dayMap[r.dateKey] = parseJson(r.data, {});
+    const earliest = new Date(dayRows[0].dateKey + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.max(1, Math.round((today - earliest) / 86400000) + 1);
+    const labelDay = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return Array.from({ length: diffDays }, (_, i) => {
+      const d = new Date(earliest);
+      d.setDate(d.getDate() + i);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dayData = dayMap[dateKey];
+      return {
+        label: labelDay(d),
+        tokens: dayData ? (dayData.promptTokens || 0) + (dayData.completionTokens || 0) : 0,
+        cost: dayData ? (dayData.cost || 0) : 0,
+        requests: dayData ? (dayData.requests || 0) : 0,
+      };
+    });
+  }
+
+  // Bucket geometry: today -> 24 hourly buckets from midnight; 24h -> last 24h;
+  // 7d/30d -> one bucket per day (local date, like usageDaily).
   let buckets;
   let labelFn;
   let bucketStart;
@@ -825,7 +858,7 @@ export async function getChartData(period = "7d", options = {}) {
       bucketStart = now - count * bucketMs;
     }
     labelFn = labelForTime;
-    buckets = Array.from({ length: count }, (_, i) => ({ label: labelFn(bucketStart + i * bucketMs), tokens: 0, cost: 0 }));
+    buckets = Array.from({ length: count }, (_, i) => ({ label: labelFn(bucketStart + i * bucketMs), tokens: 0, cost: 0, requests: 0 }));
   } else {
     const count = period === "7d" ? 7 : period === "30d" ? 30 : 60;
     isCalendarDay = true;
@@ -833,7 +866,7 @@ export async function getChartData(period = "7d", options = {}) {
     buckets = Array.from({ length: count }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() - (count - 1 - i));
-      return { label: labelForDay(d), dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, tokens: 0, cost: 0 };
+      return { label: labelForDay(d), dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, tokens: 0, cost: 0, requests: 0 };
     });
     const first = new Date(today);
     first.setDate(first.getDate() - (count - 1));
@@ -863,6 +896,7 @@ export async function getChartData(period = "7d", options = {}) {
     const cost = r.cost || 0;
     bucket.tokens += tokens;
     bucket.cost += cost;
+    bucket.requests += 1;
     if (byApiKey) {
       const { key, label, unknown } = seriesKeyOf(r);
       bucket.series ||= {};
