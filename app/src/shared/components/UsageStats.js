@@ -14,6 +14,7 @@ import Badge from "./Badge";
 import Card from "./Card";
 import OverviewCards from "@/app/(dashboard)/dashboard/usage/components/OverviewCards";
 import UsageTable, { fmt, fmtTime } from "@/app/(dashboard)/dashboard/usage/components/UsageTable";
+import ApiKeyUsageCard from "@/app/(dashboard)/dashboard/usage/components/ApiKeyUsageCard";
 import dynamic from "next/dynamic";
 // Lazy-load: keeps @xyflow/react and recharts out of the initial bundle
 const ProviderTopology = dynamic(() => import("@/app/(dashboard)/dashboard/usage/components/ProviderTopology"), { ssr: false });
@@ -486,19 +487,19 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
         <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
           <ProviderTopology
             providers={providers}
-            activeRequests={stats.activeRequests || []}
-            lastProvider={stats.recentRequests?.[0]?.provider || ""}
-            errorProvider={stats.errorProvider || ""}
+            activeRequests={stats?.activeRequests || []}
+            lastProvider={stats?.recentRequests?.[0]?.provider || ""}
+            errorProvider={stats?.errorProvider || ""}
           />
-          <RecentRequests requests={stats.recentRequests || []} />
+          <RecentRequests requests={stats?.recentRequests || []} />
         </div>
       )}
 
       {/* Usage by API key — where the traffic comes from */}
       {loading ? spinner : (
         <ApiKeyUsageCard
-          summary={stats.byApiKeySummary || {}}
-          totalRequests={stats.totalRequests || 0}
+          summary={stats?.byApiKeySummary || {}}
+          totalRequests={stats?.totalRequests || 0}
           activeKey={apiKeyFilter}
           onSelectKey={setApiKeyFilter}
         />
@@ -508,10 +509,10 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
       {loading ? spinner : <UsageChart period={period} apiKey={apiKeyFilter} groupBy={apiKeyFilter ? "" : "apiKey"} />}
 
       {/* Provider and model breakdown charts */}
-      {!loading && (stats.byProvider || stats.byModel) && (
+      {!loading && (stats?.byProvider || stats?.byModel) && (
         <div className="grid min-w-0 grid-cols-1 gap-2 lg:grid-cols-2">
-          <ProviderBarChart byProvider={stats.byProvider} />
-          <TopModelsChart byModel={stats.byModel} />
+          <ProviderBarChart byProvider={stats?.byProvider} />
+          <TopModelsChart byModel={stats?.byModel} />
         </div>
       )}
 
