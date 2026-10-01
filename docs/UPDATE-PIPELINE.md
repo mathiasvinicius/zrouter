@@ -12,13 +12,49 @@ binário de três vias entre a tag-base e a tag-alvo, aplicado sob `app/`.
 
 | Métrica | Valor |
 |---|---|
-| Base integrada | `v0.5.81` |
+| Base integrada | `v0.5.95` (absorvida em 2026-10-01) |
+| Base anterior | `v0.5.81` |
 | Destino do 9Router | `app/` |
 | Estratégia 9Router | patch de três vias vendorizado |
 | Estratégia OmniRoute | ports seletivos registrados em `ports/omniroute.json` |
 
 O inventário exato é sempre regenerado por `audit-customs.mjs`; números antigos não
 devem ser copiados para decisões futuras.
+
+### Registro do update v0.5.81 → v0.5.95 (2026-10-01)
+
+Branch `update/v0.5.95-merge`. O `git apply --3way` caiu em "falling back to direct
+application" (sobrescreveria nossos arquivos), então a aplicação foi feita por
+classificação determinística:
+
+- **113 arquivos** que só existiam na tag-base (não customizados) → cópia direta do upstream
+- **119 arquivos novos** do upstream → cópia direta
+- **38 arquivos customizados** → merge de três vias com `git merge-file`, preservando o
+  nosso lado e adotando o upstream onde são ortogonais
+
+**21 conflitos** resolvidos à mão (mantendo os dois lados quando independentes):
+`chatCore.js`, `chat.js`, `translator/index.js`, `usageRepo.js`, `aliasRepo.js`,
+`combos/page.js`, `EndpointPageClient.js`, `UsageStats.js`, `v1/models/route.js`,
+`Sidebar.js`, `Dockerfile`, `DOCKER.md`, `sseToJsonHandler.js`, `capabilities.js`,
+`rtk/index.js`, `package.json`, `cli/package.json` e os dois i18n.
+
+**Correções pós-merge** (erros que o merge introduziu e os testes pegaram):
+`rtk/index.js` (import de `RESPONSES_TOOL_OUTPUT_TYPES`), `v1/models` (`comboSeatLimits` preservando capacidade primária contra rebaixamento por assento de failover/`fallback`),
+`dashboardGuard.js` (`isLocalRequest`/`hasValidCliToken`), migração 005 (guard de tabela
+ausente), snapshots do golden header e o teste de migração (schemaVersion 5).
+
+**Portes do OmniRoute:**
+- Cursor Connect end-of-stream (`5e6624d88c`): o trailer JSON de fim de stream agora
+  reporta o erro real em vez de encerrar o turno vazio em silêncio
+- Path traversal no `/v1/responses` (`6e6b071831`): **não aplicável** — nosso Codex monta
+  a URL do registry (`_isCompact` vem do body, não da URL do cliente); não há subpath
+  controlado pelo usuário para sanitizar
+- Single-flight de cache (`4796624002`): **não aplicável** — o ZRouter não tem a camada
+  `readCache.ts` do OmniRoute; os caches existentes (usage/claude, antigravity-weekly)
+  já fazem dedupe de in-flight
+
+**Portão de qualidade:** paridade de testes com o upstream puro v0.5.95 — 107 falhas
+nossas vs 108 do upstream (todas pré-existentes; nenhuma regressão introduzida).
 
 ### Pontos de acoplamento (onde os conflitos vão doer)
 

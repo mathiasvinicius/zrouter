@@ -80,4 +80,18 @@ describe("/v1/models combo limits", () => {
       capabilities: { contextWindow: 200000 },
     });
   });
+
+  it("does not let fallback seat drag down primary model capacity in multi-seat combo", async () => {
+    const models = await modelsWithCombo("opencode-go", "mimo-v2.5", [
+      { name: "fallback", models: ["devin-cli/gpt-5.5-high"] },
+      { name: "primary-combo", models: ["ocg/mimo-v2.5", "fallback"] },
+    ]);
+    const combo = models.find((model) => model.id === "primary-combo");
+
+    expect(combo).toMatchObject({
+      context_length: 180000,
+      max_completion_tokens: 16000,
+      capabilities: { contextWindow: 180000 },
+    });
+  });
 });

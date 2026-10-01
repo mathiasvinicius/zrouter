@@ -75,6 +75,8 @@ function comboSeatLimits(combo, combosByName, visiting = new Set()) {
   try {
     for (const seat of Array.isArray(combo?.models) ? combo.models : []) {
       if (typeof seat !== "string") continue;
+      // In multi-seat combos, failover seats ("fallback") do not drag down primary capacity
+      if (combo.models.length > 1 && seat === "fallback") continue;
       const slash = seat.indexOf("/");
       if (slash <= 0) {
         const nested = combosByName.get(seat);
