@@ -8,11 +8,12 @@ import {
   extractApiKey,
   isValidApiKey,
 } from "../services/auth.js";
-import { getSettings, getApiKeyByValue, getComboById } from "@/lib/localDb";
+import { getSettings, getApiKeyByValue, getComboById, getComboByName } from "@/lib/localDb";
 import { mentalModelForProfile, recallForProfile, retainForProfile } from "@/lib/identityMemory/index.js";
 import { recallSourcesForKey, capabilitiesBlockForKey, sourcesRecallMaxChars, sourcesQueryFromBody } from "@/lib/sources/context.js";
 import { handleAntigravityQuotaError, clearAntigravityStrikes } from "../services/antigravityQuota.js";
-import { getModelInfo, getComboModels } from "../services/model.js";
+import { getModelInfo } from "../services/model.js";
+import { resolveDynamicCombo } from "../services/dynamicRouter.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { DEFAULT_HEADROOM_URL } from "@/lib/headroom/detect";
 import { getTransform as getPxpipeTransform } from "@/lib/pxpipe/loader.js";
@@ -27,6 +28,23 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 import { stripModelContextMarker } from "open-sse/utils/modelMarkers.js";
+
+/**
+ * Resolve a combo name into its ordered execution chain.
+ * Static combos take the exact pre-existing path (name lookup → models array),
+ * so their behaviour is unchanged. Only type='dynamic' combos are reordered,
+ * via dynamicRouter.resolveDynamicCombo (classifier → routingMap + fallbacks).
+ * @returns {Promise<{models: string[], thinkingLevel: string|null, meta: object|null}|null>}
+ */
+async function resolveCombo(modelStr, body) {
+  if (modelStr.includes("/")) return null;
+  const combo = await getComboByName(modelStr);
+  if (!combo || !combo.models || combo.models.length === 0) return null;
+  if (combo.type !== "dynamic") return { models: combo.models, thinkingLevel: null, meta: null };
+  const { models, meta } = await resolveDynamicCombo(combo, body);
+  log.info("DYNAMIC", `"${combo.name}" ${meta.reason} → [${models.join(", ")}]${meta.classifyMs ? ` (${meta.classifyMs}ms)` : ""}`);
+  return { models, thinkingLevel: meta.thinkingLevel || null, meta };
+}
 
 /**
  * Handle chat completion request
@@ -131,7 +149,9 @@ export async function handleChat(request, clientRawRequest = null) {
   const requiredCapabilities = detectRequiredCapabilities(body);
 
   // Check if model is a combo (has multiple models with fallback)
-  const comboModels = await getComboModels(modelStr);
+  const comboResolved = await resolveCombo(modelStr, body);
+  const comboModels = comboResolved?.models || null;
+  const dynamicThinkingLevel = comboResolved?.thinkingLevel || null;
   if (comboModels) {
     // Check for combo-specific strategy first, fallback to global
     const comboStrategies = settings.comboStrategies || {};
@@ -151,7 +171,7 @@ export async function handleChat(request, clientRawRequest = null) {
             const { tools, tool_choice, ...cleanBody } = clientRawRequest.body || {};
             cleanRawReq = { ...clientRawRequest, body: cleanBody };
           }
-          return handleSingleModelChat(b, m, cleanRawReq, request, apiKey, identityContext, memoryProfile);
+          return handleSingleModelChat(b, m, cleanRawReq, request, apiKey, identityContext, memoryProfile, dynamicThinkingLevel);
         },
         log,
         comboName: modelStr,
@@ -166,7 +186,7 @@ export async function handleChat(request, clientRawRequest = null) {
       body,
       models: augmentedModels,
       handleSingleModel: withCapacityAdapterStripping(
-        (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, identityContext, memoryProfile),
+        (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, identityContext, memoryProfile, dynamicThinkingLevel),
         adapterAdded
       ),
       log,
@@ -201,12 +221,14 @@ export async function handleChat(request, clientRawRequest = null) {
 /**
  * Handle single model chat request
  */
-async function handleSingleModelChat(body, modelStr, clientRawRequest = null, request = null, apiKey = null, identityContext = null, profile = null) {
+async function handleSingleModelChat(body, modelStr, clientRawRequest = null, request = null, apiKey = null, identityContext = null, profile = null, dynamicThinkingLevel = null) {
   const modelInfo = await getModelInfo(modelStr);
 
   // If provider is null, this might be a combo name - check and handle
   if (!modelInfo.provider) {
-    const comboModels = await getComboModels(modelStr);
+    const comboResolved = await resolveCombo(modelStr, body);
+    const comboModels = comboResolved?.models || null;
+    const comboThinking = comboResolved?.thinkingLevel || dynamicThinkingLevel;
     if (comboModels) {
       const chatSettings = await getSettings();
       // Check for combo-specific strategy first, fallback to global
@@ -228,7 +250,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
               const { tools, tool_choice, ...cleanBody } = clientRawRequest.body || {};
               cleanRawReq = { ...clientRawRequest, body: cleanBody };
             }
-            return handleSingleModelChat(b, m, cleanRawReq, request, apiKey, identityContext, profile);
+            return handleSingleModelChat(b, m, cleanRawReq, request, apiKey, identityContext, profile, comboThinking);
           },
           log,
           comboName: modelStr,
@@ -304,8 +326,9 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     const chatSettings = await getSettings();
     const providerThinking = (chatSettings.providerThinking || {})[provider] || null;
     // The key's selected combo remains the source of truth through fallback,
-    // round-robin and fusion (including the judge call).
-    const comboThinkingLevel = chatSettings.comboStrategies?.[clientRawRequest?.body?.model]?.thinkingLevel || null;
+    // round-robin and fusion (including the judge call). A per-combo settings
+    // override wins; otherwise a dynamic combo's classified level applies.
+    const comboThinkingLevel = chatSettings.comboStrategies?.[clientRawRequest?.body?.model]?.thinkingLevel || dynamicThinkingLevel || null;
     const result = await handleChatCore({
       body: { ...body, model: `${provider}/${model}` },
       modelInfo: { provider, model },

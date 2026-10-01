@@ -294,6 +294,7 @@ const STRATEGY_OPTIONS = [
   { value: "fallback", label: "Fallback — try in order" },
   { value: "round-robin", label: "Round Robin — rotate" },
   { value: "fusion", label: "Fusion — panel + judge" },
+  { value: "dynamic", label: "Dynamic — Tev1 Decision Router" },
 ];
 
 const THINKING_OPTIONS = [
@@ -334,7 +335,15 @@ function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdi
             <span className="material-symbols-outlined text-primary text-[18px]">layers</span>
           </div>
           <div className="min-w-0 flex-1">
-            <code className="block truncate font-mono text-sm font-medium">{combo.name}</code>
+            <div className="flex items-center gap-1.5">
+              <code className="block truncate font-mono text-sm font-medium">{combo.name}</code>
+              {combo.type === "dynamic" && (
+                <span className="inline-flex items-center gap-1 rounded bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400 border border-purple-500/20" title="Deterministic Tev1 Routing Active">
+                  <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                  Dynamic
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
               {combo.models.length === 0 ? (
                 <span className="text-xs text-text-muted italic">No models</span>
@@ -593,21 +602,33 @@ function CapacityAdapterCap({ cap, entry, onChange, activeProviders, getCaps }) 
   );
 }
 
-function ModelItem({ id, index, model, isFirst, isLast, onEdit, onMoveUp, onMoveDown, onRemove }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    // no transition — prevents the CSS settle animation fighting React's re-render on drop
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 999 : undefined,
-  };
+export const SPECIALIST_ROLES = [
+  { value: "auto", label: "Auto / Fallback" },
+  { value: "quick_command", label: "Operação / Comando Rápido" },
+  { value: "document_knowledge", label: "Texto / Documentação / Síntese" },
+  { value: "write_script", label: "Código / Script (Geral)" },
+  { value: "write_script_peak", label: "Código (Horário de Pico)" },
+  { value: "write_script_offpeak", label: "Código (Horário Off-Peak -50%)" },
+  { value: "architecture_and_concurrency", label: "Engenharia / Concorrência / Deadlock" },
+  { value: "tools", label: "Tools / Function Calling" },
+  { value: "vision", label: "Visão / Imagens" },
+];
+
+function ModelItem({ id, index, model, role = "auto", onRoleChange, isFirst, isLast, onEdit, onMoveUp, onMoveDown, onRemove, isDynamic = false }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(model);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   const commit = () => {
+    setEditing(false);
     const trimmed = draft.trim();
     if (trimmed && trimmed !== model) onEdit(trimmed);
     else setDraft(model);
-    setEditing(false);
   };
 
   const handleKeyDown = (e) => {
@@ -619,7 +640,7 @@ function ModelItem({ id, index, model, isFirst, isLast, onEdit, onMoveUp, onMove
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 bg-black/[0.02] hover:bg-black/[0.04] dark:bg-white/[0.02] dark:hover:bg-white/[0.04] transition-colors ${isDragging ? "shadow-md ring-1 ring-primary/30" : ""}`}
+      className={`group flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 bg-black/[0.02] hover:bg-black/[0.04] dark:bg-white/[0.02] dark:hover:bg-white/[0.04] transition-colors ${isDragging ? "shadow-md ring-1 ring-primary/30" : ""}`}
     >
       {/* Drag handle */}
       <button
@@ -659,6 +680,24 @@ function ModelItem({ id, index, model, isFirst, isLast, onEdit, onMoveUp, onMove
         </div>
       )}
 
+      {/* Combobox de Especialidade no modo Dinâmico */}
+      {isDynamic && (
+        <div className="shrink-0 w-36 sm:w-44">
+          <select
+            value={role}
+            onChange={(e) => onRoleChange?.(e.target.value)}
+            className="w-full text-[11px] py-1 px-1.5 rounded border border-black/10 dark:border-white/10 bg-background text-text-main focus:outline-none focus:border-primary truncate"
+            title="Escolha a preferência/especialidade para este modelo"
+          >
+            {SPECIALIST_ROLES.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Priority arrows */}
       <div className="flex shrink-0 items-center gap-0.5">
         <button
@@ -695,10 +734,55 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
   // Initialize state with combo values - key prop on parent handles reset on remount
   const [name, setName] = useState(combo?.name || "");
   const [models, setModels] = useState(combo?.models || []);
+  const [type, setType] = useState(combo?.type || "static");
+  const [modelRoles, setModelRoles] = useState({});
+  const [defaultModel, setDefaultModel] = useState("");
+  const [showConfigRaw, setShowConfigRaw] = useState(false);
+  const [configText, setConfigText] = useState(combo?.config ? JSON.stringify(combo.config, null, 2) : "{}");
+  const [configError, setConfigError] = useState("");
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState("");
   const [modelAliases, setModelAliases] = useState({});
+
+  // Inicializa modelRoles a partir do config.routingMap existente
+  useEffect(() => {
+    if (combo?.config && typeof combo.config === "object") {
+      const routing = combo.config.routingMap || {};
+      const roles = {};
+      for (const [role, mdl] of Object.entries(routing)) {
+        if (mdl) roles[mdl] = role;
+      }
+      setModelRoles(roles);
+      setDefaultModel(combo.config.defaultModel || (combo.models && combo.models[0]) || "");
+      setConfigText(JSON.stringify(combo.config, null, 2));
+    }
+  }, [combo]);
+
+  const handleRoleChange = (modelName, newRole) => {
+    const updated = { ...modelRoles, [modelName]: newRole };
+    setModelRoles(updated);
+    syncConfigFromRoles(updated, models, defaultModel);
+  };
+
+  const syncConfigFromRoles = (roles, currentModels, defMdl) => {
+    const routingMap = {};
+    const fallbacks = [];
+    for (const m of currentModels) {
+      const r = roles[m] || "auto";
+      if (r !== "auto") {
+        routingMap[r] = m;
+      } else {
+        fallbacks.push(m);
+      }
+    }
+    const newCfg = {
+      defaultModel: defMdl || currentModels[0] || "",
+      routingMap,
+      fallbacks: fallbacks.length ? fallbacks : currentModels,
+    };
+    setConfigText(JSON.stringify(newCfg, null, 2));
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -756,16 +840,26 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
 
   const handleAddModel = (model) => {
     if (!models.includes(model.value)) {
-      setModels([...models, model.value]);
+      const updated = [...models, model.value];
+      setModels(updated);
+      syncConfigFromRoles(modelRoles, updated, defaultModel || updated[0]);
     }
   };
 
   const handleDeselectModel = (model) => {
-    setModels(models.filter((m) => m !== model.value));
+    const updated = models.filter((m) => m !== model.value);
+    setModels(updated);
+    syncConfigFromRoles(modelRoles, updated, defaultModel);
   };
 
   const handleRemoveModel = (index) => {
-    setModels(models.filter((_, i) => i !== index));
+    const removedModel = models[index];
+    const updated = models.filter((_, i) => i !== index);
+    setModels(updated);
+    const updatedRoles = { ...modelRoles };
+    delete updatedRoles[removedModel];
+    setModelRoles(updatedRoles);
+    syncConfigFromRoles(updatedRoles, updated, defaultModel);
   };
 
   const handleMoveUp = (index) => {
@@ -784,8 +878,18 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
 
   const handleSave = async () => {
     if (!validateName(name)) return;
+    let parsedConfig = {};
+    if (type === "dynamic") {
+      try {
+        parsedConfig = JSON.parse(configText);
+      } catch (err) {
+        setConfigError("Invalid JSON configuration");
+        return;
+      }
+    }
+    setConfigError("");
     setSaving(true);
-    await onSave({ name: name.trim(), models });
+    await onSave({ name: name.trim(), models, type, config: parsedConfig });
     setSaving(false);
   };
 
@@ -813,6 +917,60 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
             </p>
           </div>
 
+          {/* Type Selection */}
+          <div className="flex flex-col gap-1.5 p-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.01]">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-text-main flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px] text-purple-500">auto_awesome</span>
+                  Dynamic Routing (Tev1)
+                </span>
+                <p className="text-[10px] text-text-muted">
+                  Classificação semântica local para escolher o especialista ideal
+                </p>
+              </div>
+              <Toggle
+                checked={type === "dynamic"}
+                onChange={(checked) => {
+                  const newType = checked ? "dynamic" : "static";
+                  setType(newType);
+                  if (checked) syncConfigFromRoles(modelRoles, models, defaultModel);
+                }}
+              />
+            </div>
+
+            {type === "dynamic" && (
+              <div className="mt-2 pt-2 border-t border-black/5 dark:border-white/5 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-text-muted">
+                    Defina a preferência de cada modelo na lista abaixo (combobox)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigRaw(!showConfigRaw)}
+                    className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">code</span>
+                    {showConfigRaw ? "Ocultar JSON" : "Editar JSON Bruto"}
+                  </button>
+                </div>
+
+                {showConfigRaw && (
+                  <div className="flex flex-col gap-1">
+                    <textarea
+                      value={configText}
+                      onChange={(e) => setConfigText(e.target.value)}
+                      rows={6}
+                      className="w-full font-mono text-[11px] p-2 rounded border border-black/10 dark:border-white/10 bg-background focus:outline-none focus:border-primary"
+                      placeholder="{ routingMap: { ... }, fallbacks: [ ... ] }"
+                    />
+                    {configError && <span className="text-[10px] text-red-500">{configError}</span>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Models */}
           <div>
             <label className="text-sm font-medium mb-1.5 block">Models</label>
@@ -832,12 +990,16 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
                       id={uid}
                       index={index}
                       model={model}
+                      role={modelRoles[model] || "auto"}
+                      onRoleChange={(newRole) => handleRoleChange(model, newRole)}
+                      isDynamic={type === "dynamic"}
                       isFirst={index === 0}
                       isLast={index === modelItems.length - 1}
                       onEdit={(newVal) => {
                         const updated = [...models];
                         updated[index] = newVal;
                         setModels(updated);
+                        syncConfigFromRoles(modelRoles, updated, defaultModel);
                       }}
                       onMoveUp={() => handleMoveUp(index)}
                       onMoveDown={() => handleMoveDown(index)}

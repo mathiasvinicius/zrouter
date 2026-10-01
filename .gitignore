@@ -18,6 +18,7 @@ jwt-secret*
 # ─────────────────────────────────────────────────────────────
 data/
 app/data/
+bases/
 app/tmp/
 tmp/
 *.sqlite

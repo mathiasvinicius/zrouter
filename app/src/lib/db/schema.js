@@ -3,7 +3,7 @@
 // pre-change safety backup in migrate.js: when the stored version is lower,
 // one lightweight DB backup is taken before applying schema changes. Forgetting
 // to bump only skips that backup — it does NOT break the additive auto-sync.
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const PRAGMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -108,6 +108,10 @@ export const TABLES = {
       name: "TEXT UNIQUE NOT NULL",
       kind: "TEXT",
       models: "TEXT NOT NULL",
+      // Fase 2 — 'static' combos are today's fixed fallback list; 'dynamic'
+      // combos route via config.routingMap + config.fallbacks.
+      type: "TEXT NOT NULL DEFAULT 'static'",
+      config: "TEXT NOT NULL DEFAULT '{}'",
       createdAt: "TEXT NOT NULL",
       updatedAt: "TEXT NOT NULL",
     },
