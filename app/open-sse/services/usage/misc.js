@@ -130,6 +130,26 @@ export async function getOllamaUsage(apiKey, providerSpecificData, proxyOptions 
     }
 
     if (Object.keys(quotas).length === 0) {
+      if (typeof data?.totals?.request_count === "number") {
+        quotas["Requests (7d)"] = {
+          used: data.totals.request_count,
+          total: data.totals.request_count,
+          remainingPercentage: 100,
+          unlimited: true,
+        };
+        const latestDay = Array.isArray(data?.days) && data.days[data.days.length - 1];
+        if (latestDay && typeof latestDay.request_count === "number") {
+          quotas["Requests (Today)"] = {
+            used: latestDay.request_count,
+            total: latestDay.request_count,
+            remainingPercentage: 100,
+            unlimited: true,
+          };
+        }
+      }
+    }
+
+    if (Object.keys(quotas).length === 0) {
       return {
         plan,
         message: "Ollama Cloud connected. No usage limits reported.",
