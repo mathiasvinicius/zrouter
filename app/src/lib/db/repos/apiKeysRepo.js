@@ -24,6 +24,7 @@ function rowToKey(row) {
     mentalModelId: row.mentalModelId || null,
     memoryEnabled: row.memoryEnabled === 1 || row.memoryEnabled === true,
     isService: row.isService === 1 || row.isService === true,
+    enforceCombo: row.enforceCombo === undefined || row.enforceCombo === null ? true : (row.enforceCombo === 1 || row.enforceCombo === true),
     isActive: row.isActive === 1 || row.isActive === true,
     sources: parseSources(row.sources),
     createdAt: row.createdAt,
@@ -97,6 +98,7 @@ export async function createApiKey(name, machineId, profile = {}) {
     memoryBackend: storedMemoryBackend(profile.memoryBackend),
     mentalModelId: profile.mentalModelId || null,
     memoryEnabled: profile.memoryEnabled !== false,
+    enforceCombo: profile.enforceCombo !== false,
     isService: profile.isService === true,
     sources: parseSources(serializeSources(profile.sources)),
     isActive: true,
@@ -104,11 +106,11 @@ export async function createApiKey(name, machineId, profile = {}) {
     updatedAt: new Date().toISOString(),
   };
   db.run(
-    `INSERT INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, memoryBackend, mentalModelId, memoryEnabled, sources, isService, isActive, createdAt, updatedAt)
-     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, memoryBackend, mentalModelId, memoryEnabled, sources, enforceCombo, isService, isActive, createdAt, updatedAt)
+     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, apiKey.comboId, apiKey.soul,
       apiKey.hindsightBankId, apiKey.memoryBackend, apiKey.mentalModelId, apiKey.memoryEnabled ? 1 : 0, serializeSources(apiKey.sources),
-      apiKey.isService ? 1 : 0, 1, apiKey.createdAt, apiKey.updatedAt]
+      apiKey.enforceCombo ? 1 : 0, apiKey.isService ? 1 : 0, 1, apiKey.createdAt, apiKey.updatedAt]
   );
   return apiKey;
 }
@@ -123,10 +125,10 @@ export async function updateApiKey(id, data) {
     merged.updatedAt = new Date().toISOString();
     db.run(
       `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, comboId = ?, soul = ?,
-       hindsightBankId = ?, memoryBackend = ?, mentalModelId = ?, memoryEnabled = ?, sources = ?, isService = ?, isActive = ?, updatedAt = ? WHERE id = ?`,
+       hindsightBankId = ?, memoryBackend = ?, mentalModelId = ?, memoryEnabled = ?, sources = ?, enforceCombo = ?, isService = ?, isActive = ?, updatedAt = ? WHERE id = ?`,
       [merged.key, merged.name, merged.machineId, merged.comboId || null, merged.soul || "",
         merged.hindsightBankId || null, storedMemoryBackend(merged.memoryBackend), merged.mentalModelId || null, merged.memoryEnabled ? 1 : 0, serializeSources(merged.sources),
-        merged.isService ? 1 : 0, merged.isActive ? 1 : 0, merged.updatedAt, id]
+        merged.enforceCombo !== false ? 1 : 0, merged.isService ? 1 : 0, merged.isActive ? 1 : 0, merged.updatedAt, id]
     );
     result = merged;
   });

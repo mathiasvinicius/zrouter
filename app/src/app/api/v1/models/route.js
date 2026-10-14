@@ -428,12 +428,10 @@ export async function buildModelsList(kindFilter, options = {}) {
     } else {
       const comboCaps = aggregateComboCapabilities(combo.models, comboByName, comboSeatCapabilities);
       if (comboCaps) entry.capabilities = comboCaps;
-      // Any seat can serve the request, so the only window a combo can promise is
-      // its smallest. Combo entries were the only models on this endpoint that
-      // published no limits at all, which leaves a client to guess from the name —
-      // and it guesses high (see the snake_case note on the per-provider path).
+      // When combo limits are derived, prefer max capacity from getComboCapabilities,
+      // and only fill limits if not already established.
       const { contextWindow, maxOutput } = comboSeatLimits(combo, combosByName);
-      if (Number.isFinite(contextWindow)) entry.context_length = contextWindow;
+      if (!entry.context_length && Number.isFinite(contextWindow)) entry.context_length = contextWindow;
       if (Number.isFinite(maxOutput)) entry.max_completion_tokens = maxOutput;
     }
     models.push(entry);

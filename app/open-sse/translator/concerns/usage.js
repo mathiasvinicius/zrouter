@@ -51,8 +51,10 @@ const USAGE_EXTRACTORS = {
     return out;
   },
   ollama(raw) {
-    const input = n(raw.prompt_eval_count), output = n(raw.eval_count);
-    return { promptTokens: input, completionTokens: output, totalTokens: input + output };
+    const input = n(raw.prompt_eval_count),
+      output = n(raw.eval_count),
+      cached = n(raw.prompt_eval_cached_count);
+    return { promptTokens: input, completionTokens: output, totalTokens: input + output, cachedTokens: cached };
   },
   commandcode(raw) {
     const input = n(raw.inputTokens), output = n(raw.outputTokens);

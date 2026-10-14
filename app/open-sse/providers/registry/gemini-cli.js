@@ -38,6 +38,7 @@ export default {
     { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite" },
   ],
   oauth: {
+    ...GOOGLE_OAUTH_CLIENT,
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     userInfoUrl: "https://www.googleapis.com/oauth2/v1/userinfo",

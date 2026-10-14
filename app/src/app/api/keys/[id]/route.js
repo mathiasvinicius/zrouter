@@ -23,7 +23,7 @@ async function updateKey(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { isActive, name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources } = body;
+    const { isActive, name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources, enforceCombo } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -33,6 +33,7 @@ async function updateKey(request, { params }) {
     const updateData = {};
     if (isActive !== undefined) updateData.isActive = isActive;
     if (name !== undefined) updateData.name = String(name).trim();
+    if (enforceCombo !== undefined) updateData.enforceCombo = enforceCombo !== false;
     if (comboId !== undefined) {
       if (!comboId || !(await getComboById(comboId))) {
         return NextResponse.json({ error: "A valid combo is required" }, { status: 400 });

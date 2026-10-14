@@ -90,6 +90,7 @@ export const TABLES = {
       mentalModelId: "TEXT",
       memoryEnabled: "INTEGER DEFAULT 1",
       sources: "TEXT NOT NULL DEFAULT '{}'",
+      enforceCombo: "INTEGER DEFAULT 1",
       isService: "INTEGER DEFAULT 0",
       isActive: "INTEGER DEFAULT 1",
       createdAt: "TEXT NOT NULL",

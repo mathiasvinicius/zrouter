@@ -1,0 +1,82 @@
+# Histórico de Releases e Aprimoramentos — ZRouter
+
+Este documento consolida a evolução, marcos arquiteturais, aprimoramentos customizados e correções do **ZRouter (Sovereign AI Gateway)** em relação ao upstream (9Router/OmniRoute) e ao ecossistema ITMS Solutions.
+
+---
+
+## 📌 Visão Geral das Camadas do ZRouter
+
+O ZRouter opera em uma arquitetura de alta disponibilidade e soberania:
+* **Nó Primário Ativo:** VPS Oracle (`100.70.32.52`), responsável pelo atendimento público em `https://zrouter.itms.com.br`.
+* **Nó Standby / Failover:** Zenith Server (`100.66.108.56`), mantido sincronizado via watchdog (`zrouter_failover_watchdog.sh`).
+* **Memória & Conhecimento:** Grafos no Neo4j, cadernos autorizados no Open Notebook e integração por API Key.
+* **Economia de Tokens:** RTK Token Saver (-40% em prompts) e Prompt-Cache Policy.
+
+---
+
+## [v0.5.95] — 2026-10-01
+### ✨ Combos Dinâmicos, Upstream v0.5.95 & Expansão de Modelos
+
+#### 1. Roteador de Decisão Dinâmico (TEV1)
+- Implementação do algoritmo determinístico em `app/src/sse/services/dynamicRouter.js` (342 linhas).
+- Classificação inteligente por tarefa (código, raciocínio complexo, síntese, visão multimodal).
+- Fallback automático com preservação de contexto e transição transparente de modelos (ex.: `cx/gpt-5.6-sol`, `ollama/glm-5.3-flash`).
+
+#### 2. Upstream Merge 9Router v0.5.95
+- Integração de 340 arquivos upstream (+23.356 / -1.766 linhas).
+- **Responses API Watchdog:** timeout de segurança de 3 segundos na finalização da Responses API.
+- **Tokens no `response.completed`:** reporte fidedigno de tokens utilizados para fluxos de streaming.
+- **Claude & Anthropic:** suporte aprimorado a Claude prefill e prompt-caching nativo.
+- **Suporte Grok CLI:** compatibilidade com Grok CLI 1.0.44 e headers atualizados.
+- **Sanitização de Schemas:** validação e limpeza prévia de JSON schemas para APIs do Gemini e Antigravity.
+
+#### 3. Novos Provedores & Modelos
+- Inclusão dos provedores: `atria`, `muse`, `tinyfish`, `dahl`, `agnes`, `bai`, `tokenharbor`, `v1m`, `opencode-zen`, `qoder-cn`.
+- Adição de modelos de nova geração: GPT-6.x, Claude Sonnet 4.6 / Opus 5.5, Gemini 3.8 / 3.7.
+
+#### 4. Catálogo Central de Skills
+- Endpoint unificado `GET /v1/skills` expondo índice compacto para todos os agentes autenticados sem duplicação de dados.
+
+#### 5. Correções de Dashboard e UI
+- `UsageChart`: definição segura de `cfg` e compatibilização com propriedades de `VIEW_CONFIG`.
+- `ApiKeyUsageCard`: importação defensiva em `UsageStats` com guarda contra estatísticas nulas.
+- `TokenSaver`: restauração de métricas de cache e relatórios precisos por períodos móveis.
+
+---
+
+## [v0.5.81] — 2026-09-19
+### 🔄 Upstream 9Router 0.5.81 & Portes Seletivos do OmniRoute
+
+- **Merge de Base:** consolidação do 9Router 0.5.81 mantendo 216 arquivos modificados sob `CUSTOMS.md`.
+- **Portes OmniRoute:**
+  - Tratamento de erro explícito em trailers de stream do Cursor (Cursor end-of-stream).
+  - Prevenção de travamentos em fluxos de fallback com códigos HTTP 410 (modelos aposentados).
+- **Ollama Stream:** aceitação de streams nativos em formato `ndjson`.
+- **Topologia de Failover:** scripts de sincronização contínua e replicação de banco de dados (`data.sqlite`) entre Zenith e VPS Oracle.
+
+---
+
+## [Marcos Fundamentais — Entregas 1 a 9] — 2026-09-15 a 2026-09-18
+### 🏗️ Customizações Estruturais do ZRouter Soberano
+
+- **Entrega 9 (Fontes & Cadernos):** Seletor de cadernos Open Notebook e fontes Notion por API Key com injeção citável e isolamento de permissões.
+- **Entrega 8 (Economia de Cotas):** RTK Token Saver (-40% de tokens), Prompt-Cache Policy e Credential Health Scheduler em background.
+- **Entrega 7 (Uso por Chave):** Dashboard de consumo granular por API Key (`/api/usage/history`, `/api/usage/chart`) e rate limits por cliente.
+- **Entrega 6 (Rebranding & Soberania):** Desvinculação de telemetrias externas, porta fixa de produção `20128`, identidade visual soberana ITMS.
+- **Entrega 4 & 5 (Neo4j Único & Bootstrap):** Grafo centralizado de memórias de longo prazo e entidades do agente (EVE/Zenith) associado por API Key.
+- **Entrega 3 (Contexto Automático):** Regras globais de memória, precedência de identidade do agente (`SOUL.md`) sobre a chave padrão.
+- **Entrega 1 & 2 (Open-SSE Core):** Tradução universal de formatos OpenAI, Anthropic, Gemini e streaming resiliente.
+
+---
+
+## 🔍 Diagnóstico Recente de Cotas (`/dashboard/quota`) — 2026-10-10
+
+### 1. Ollama Cloud (`9router_key2`)
+* **Situação:** Painel exibe *"Ollama Cloud connected. No usage limits reported."*.
+* **Causa Identificada:** Conta Pro ativa (`"Plan": "pro"`). A API oficial da Ollama (`/api/usage`) não impõe nem retorna janelas de limite percentual para contas pagas; ela retorna métricas de volumetria (`totals.request_count: 1.310 reqs (7d)`, `115 reqs (hoje)`).
+* **Solução:** O gateway pode ler esses contadores de requisições e exibir o card com status `Unlimited` verde e contagem real de chamadas, eliminando a mensagem de ausência de dados.
+
+### 2. Gemini CLI vs Antigravity (`viniciusmathias@gmail.com`)
+* **Situação:** Gemini CLI falha na atualização de cota com erro 403.
+* **Causa Identificada:** O Google descontinuou o cliente OAuth do Gemini CLI para indivíduos (`UNSUPPORTED_CLIENT #3501`), instruindo migração para o ecossistema Antigravity.
+* **Solução Implementada/Recomendada:** A conexão **Antigravity** já está ativa no ZRouter para a mesma conta, monitorando com precisão os modelos Gemini 3.8/3.7 e as cotas de 5h e semanais. O Gemini CLI deve ser tratado como legado.

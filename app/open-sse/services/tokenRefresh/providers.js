@@ -201,6 +201,10 @@ export async function refreshClaudeOAuthToken(refreshToken, log) {
 
 export async function refreshGoogleToken(refreshToken, clientId, clientSecret, log) {
   if (!refreshToken) return null;
+  if (!clientId || clientId === "undefined") {
+    log?.error?.("TOKEN_REFRESH", "Google token refresh aborted: clientId is empty or undefined");
+    return null;
+  }
   return dedupRefresh(`google:${clientId}`, refreshToken, async () => {
   try {
     const response = await fetch(OAUTH_ENDPOINTS.google.token, {

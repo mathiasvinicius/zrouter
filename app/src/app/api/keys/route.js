@@ -24,7 +24,7 @@ export async function POST(request) {
     const body = await request.json();
     // `hindsightBankId` is the memory bank id (historical name, kept on purpose);
     // a legacy `memoryBackend: "hindsight"` is normalized to Neo4j, never an error.
-    const { name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources } = body;
+    const { name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources, enforceCombo } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -52,6 +52,7 @@ export async function POST(request) {
     }
     const apiKey = await createApiKey(name, machineId, {
       comboId,
+      enforceCombo: enforceCombo !== false,
       soul: typeof soul === "string" ? soul : "",
       sources: normalizeKeySources(sources),
       ...memoryProfile,

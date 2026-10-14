@@ -1,4 +1,5 @@
 import { PROVIDERS } from "../config/providers.js";
+import { ANTIGRAVITY_OAUTH_CLIENT, GOOGLE_OAUTH_CLIENT } from "../providers/shared.js";
 import { OAUTH_ENDPOINTS, REFRESH_LEAD_MS } from "../config/appConstants.js";
 import {
   refreshXaiToken,
@@ -133,8 +134,20 @@ function vertexRefreshHandler(c, log) {
 }
 
 const REFRESH_HANDLERS = {
-  "gemini-cli": (c, log) => refreshGoogleToken(c.refreshToken, PROVIDERS["gemini-cli"].clientId, PROVIDERS["gemini-cli"].clientSecret, log),
-  antigravity: (c, log) => refreshGoogleToken(c.refreshToken, PROVIDERS.antigravity.clientId, PROVIDERS.antigravity.clientSecret, log),
+  "gemini-cli": (c, log) =>
+    refreshGoogleToken(
+      c.refreshToken,
+      PROVIDERS["gemini-cli"]?.clientId || GOOGLE_OAUTH_CLIENT.clientId,
+      PROVIDERS["gemini-cli"]?.clientSecret || GOOGLE_OAUTH_CLIENT.clientSecret,
+      log
+    ),
+  antigravity: (c, log) =>
+    refreshGoogleToken(
+      c.refreshToken,
+      PROVIDERS.antigravity?.clientId || ANTIGRAVITY_OAUTH_CLIENT.clientId,
+      PROVIDERS.antigravity?.clientSecret || ANTIGRAVITY_OAUTH_CLIENT.clientSecret,
+      log
+    ),
   claude: (c, log) => refreshClaudeOAuthToken(c.refreshToken, log),
   codex: (c, log) => refreshCodexToken(c.refreshToken, log),
   iflow: (c, log) => refreshIflowToken(c.refreshToken, log),
@@ -169,7 +182,7 @@ export async function getAccessToken(provider, credentials, log) {
 
 async function _getAccessTokenInternal(provider, credentials, log) {
   if (provider === "gemini") {
-    return refreshGoogleToken(credentials.refreshToken, PROVIDERS.gemini.clientId, PROVIDERS.gemini.clientSecret, log);
+    return refreshGoogleToken(credentials.refreshToken, PROVIDERS.gemini?.clientId || GOOGLE_OAUTH_CLIENT.clientId, PROVIDERS.gemini?.clientSecret || GOOGLE_OAUTH_CLIENT.clientSecret, log);
   }
   const handler = REFRESH_HANDLERS[provider];
   if (!handler) {

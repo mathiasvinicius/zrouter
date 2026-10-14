@@ -108,10 +108,27 @@ export async function handleChat(request, clientRawRequest = null) {
     log.debug("AUTH", `Internal service key: ${profile.name || profile.id}`);
   } else {
     const combo = profile.comboId ? await getComboById(profile.comboId) : null;
-    if (!combo) return errorResponse(HTTP_STATUS.FORBIDDEN, "API key has no valid combo assigned");
-    modelStr = combo.name;
-    body.model = combo.name;
-    if (clientRawRequest?.body) clientRawRequest.body.model = combo.name;
+    const shouldEnforce = profile.enforceCombo !== false && profile.enforceCombo !== 0;
+    const requestedModel = (body.model || "").trim();
+
+    if (shouldEnforce) {
+      if (!combo) return errorResponse(HTTP_STATUS.FORBIDDEN, "API key has no valid combo assigned");
+      modelStr = combo.name;
+      body.model = combo.name;
+      if (clientRawRequest?.body) clientRawRequest.body.model = combo.name;
+    } else {
+      // Modo flexível: se o cliente escolheu um modelo específico, respeita.
+      // Caso contrário, usa o combo configurado como fallback padrão.
+      if (requestedModel && requestedModel !== "default") {
+        modelStr = requestedModel;
+      } else if (combo) {
+        modelStr = combo.name;
+        body.model = combo.name;
+        if (clientRawRequest?.body) clientRawRequest.body.model = combo.name;
+      } else {
+        return errorResponse(HTTP_STATUS.BAD_REQUEST, "No model requested and API key has no default combo");
+      }
+    }
     memoryProfile = profile;
     // Same query derivation the memory recall uses — delegated, not duplicated.
     const sourcesQuery = sourcesQueryFromBody(body);

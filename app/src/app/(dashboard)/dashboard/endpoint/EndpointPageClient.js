@@ -33,7 +33,7 @@ export default function APIPageClient({ machineId }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [profileForm, setProfileForm] = useState({
-    comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true,
+    comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true, enforceCombo: true,
     sources: emptyKeySources(),
   });
   const [editingKey, setEditingKey] = useState(null);
@@ -670,7 +670,7 @@ export default function APIPageClient({ machineId }) {
         setCreatedKey(data.key);
         await fetchData();
         setNewKeyName("");
-        setProfileForm({ comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true, sources: emptyKeySources() });
+        setProfileForm({ comboId: "", soul: "", hindsightBankId: "", memoryBackend: "", memoryEnabled: true, enforceCombo: true, sources: emptyKeySources() });
         setShowAddModal(false);
       }
     } catch (error) {
@@ -1147,9 +1147,13 @@ export default function APIPageClient({ machineId }) {
                   </p>
                   <p className="text-xs text-text-muted mt-1">
                     Combo: {combos.find((combo) => combo.id === key.comboId)?.name || "Not assigned"}
+                    {key.enforceCombo === false && (
+                      <span className="ml-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-500">
+                        Modelo Livre
+                      </span>
+                    )}
                     {" · "}Memory: {key.memoryEnabled ? key.hindsightBankId || "Not assigned" : "Disabled"}
                     {key.memoryEnabled ? ` (${MEMORY_BACKEND_LABELS[effectiveMemoryBackend(key, globalMemoryBackend)]})` : ""}
-
                   </p>
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
@@ -1234,6 +1238,14 @@ export default function APIPageClient({ machineId }) {
               {combos.map((combo) => <option key={combo.id} value={combo.id}>{combo.name}</option>)}
             </select>
           </label>
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={profileForm.enforceCombo !== false}
+              onChange={(event) => setProfileForm((value) => ({ ...value, enforceCombo: event.target.checked }))}
+            />
+            <span>Forçar este combo (desmarque para permitir que o cliente envie qualquer modelo livremente)</span>
+          </label>
           <Input
             label={`Memory Bank ID${profileForm.memoryEnabled ? " (required)" : " (optional)"}`}
             value={profileForm.hindsightBankId}
@@ -1307,6 +1319,14 @@ export default function APIPageClient({ machineId }) {
               <option value="">Select a combination</option>
               {combos.map((combo) => <option key={combo.id} value={combo.id}>{combo.name}</option>)}
             </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={editingKey.enforceCombo !== false}
+              onChange={(event) => setEditingKey((value) => ({ ...value, enforceCombo: event.target.checked }))}
+            />
+            <span>Forçar este combo (desmarque para permitir que o cliente envie qualquer modelo livremente)</span>
           </label>
           <Input label={`Memory Bank ID${editingKey.memoryEnabled !== false ? " (required)" : " (optional)"}`}
             value={editingKey.hindsightBankId || ""}
