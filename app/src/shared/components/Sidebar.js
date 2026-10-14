@@ -325,8 +325,6 @@ export default function Sidebar({ onClose }) {
 
       </aside>
 
-      {/* Remote Promo Modal */}
-
       {/* Update Confirmation Modal */}
       <ConfirmModal
         isOpen={showUpdateModal}

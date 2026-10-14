@@ -14,6 +14,31 @@ O ZRouter opera em uma arquitetura de alta disponibilidade e soberania:
 
 ---
 
+## [v0.5.99] — 2026-10-14
+### 🚀 Upstream Merge v0.5.99, Controle de Acesso por Chave, Claude 5.5 & Resiliência
+
+#### 1. Upstream Merge 9Router v0.5.99
+- **Controle de Acesso por API Key (`KeyAccessControls`):** Restrição granular por chave (`accessRestricted` / `accessAllow`) com gating automático nos endpoints de inferência `/v1/*`, permitindo limitar chaves a combos ou modelos autorizados sem expor credenciais dos provedores.
+- **Suporte a AWS Bedrock & Bedrock-xAI:** Inclusão de executores e credenciais seguras para Amazon Bedrock (`@aws-sdk/credential-providers`, assinatura Sigv4, suporte a STS e sessões SSO).
+- **Provedores MiniMax Code:** Integração dos novos provedores `minimax-code` e `minimax-code-global` com OAuth integrado e telemetria de uso.
+- **Hermes CLI Multi-Perfil:** Suporte a múltiplos perfis no Hermes Agent (`?profile=...`), com persistência e manipulação isolada de configurações YAML e variáveis `.env`.
+- **Relay Netlify Deploy para Proxy Pools:** Novo gerador de proxy pool via Netlify (`netlifyRelay.js`).
+
+#### 2. Preservação Total dos Pilares Soberanos do ZRouter
+- **Roteamento Dinâmico TEV1:** Preservação integral do classificador e motor dinâmico TEV1.
+- **Identidade e Memória no Neo4j:** Mantido o backend exclusivo Neo4j (`Memory.bank`, injeção de identidade e recall contextual).
+- **Fontes de Conhecimento por Chave (`sources`):** Controle per-key mantido para Notion, Open Notebook e Neo4j banks.
+- **Flag `enforceCombo`:** Modo flexível vs modo estrito para direcionamento de chamadas a combos designados.
+- **Zero Ads / Soberania Visual:** Eliminação completa de links promocionais externos (9Remote/9English).
+
+#### 3. Antigravity & Suporte a Claude 5.5
+- Suporte oficial aos identificadores Antigravity Claude 5.5 (`claude-5-5-sonnet`, `claude-5-5-haiku`, etc.) com normalização MITM e sinônimos automáticos.
+- Extração de `resetsAtMs` em respostas 429 de erro de cota do Antigravity.
+- Sanitização de schemas de ferramentas (`$ref` cleanup) para payloads Gemini e Antigravity.
+- Suporte nativo a `x-goog-api-key` e parâmetros de consulta `?key=` na autenticação de rotas `/v1beta/models`.
+
+---
+
 ## [v0.5.95] — 2026-10-01
 ### ✨ Combos Dinâmicos, Upstream v0.5.95 & Expansão de Modelos
 

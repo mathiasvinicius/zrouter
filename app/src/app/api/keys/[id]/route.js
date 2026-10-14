@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { deleteApiKey, getApiKeyById, getComboById, updateApiKey } from "@/lib/localDb";
 import { ensureBank, ensureMentalModel } from "@/lib/identityMemory/index.js";
 import { resolveMemoryProfile } from "@/lib/identityMemory/profileConfig.js";
 import { normalizeKeySources } from "@/lib/db/repos/apiKeysRepo.js";
+import { validateKeyAccessInput } from "@/shared/utils/keyAccess.js";
 
 // GET /api/keys/[id] - Get single key
 export async function GET(request, { params }) {
@@ -23,7 +23,7 @@ async function updateKey(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { isActive, name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources, enforceCombo } = body;
+    const { isActive, name, comboId, soul, hindsightBankId, memoryBackend, memoryEnabled, sources, enforceCombo, access } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -32,6 +32,11 @@ async function updateKey(request, { params }) {
 
     const updateData = {};
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (access !== undefined) {
+      const checked = validateKeyAccessInput(access);
+      if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
+      updateData.access = checked.value;
+    }
     if (name !== undefined) updateData.name = String(name).trim();
     if (enforceCombo !== undefined) updateData.enforceCombo = enforceCombo !== false;
     if (comboId !== undefined) {

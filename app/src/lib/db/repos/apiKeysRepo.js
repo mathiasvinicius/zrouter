@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { getAdapter } from "../driver.js";
+import { keyAccessFromColumns, keyAccessToColumns } from "@/shared/utils/keyAccess.js";
+import { KEY_ACCESS_UNRESTRICTED } from "@/shared/constants/keyAccess.js";
 
 // The apiKeys.memoryBackend CHECK only accepts NULL or 'neo4j' (Entrega 4).
 // Coerce anything else (a legacy 'hindsight' value) so a direct repo write can
@@ -29,6 +31,7 @@ function rowToKey(row) {
     sources: parseSources(row.sources),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt || row.createdAt,
+    access: keyAccessFromColumns(row.accessRestricted, row.accessAllow),
   };
 }
 
@@ -82,11 +85,20 @@ export async function getApiKeyById(id) {
   return rowToKey(row);
 }
 
+// Used by the /v1 handlers to read the presented key's access settings.
+export async function getApiKeyByKey(key) {
+  if (!key) return null;
+  const db = await getAdapter();
+  const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
+  return rowToKey(row);
+}
+
 export async function createApiKey(name, machineId, profile = {}) {
   if (!machineId) throw new Error("machineId is required");
   const db = await getAdapter();
   const { generateApiKeyWithMachine } = await import("@/shared/utils/apiKey");
   const result = generateApiKeyWithMachine(machineId);
+  const cols = keyAccessToColumns(profile.access || KEY_ACCESS_UNRESTRICTED);
   const apiKey = {
     id: uuidv4(),
     name,
@@ -104,13 +116,14 @@ export async function createApiKey(name, machineId, profile = {}) {
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    access: keyAccessFromColumns(cols.accessRestricted, cols.accessAllow),
   };
   db.run(
-    `INSERT INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, memoryBackend, mentalModelId, memoryEnabled, sources, enforceCombo, isService, isActive, createdAt, updatedAt)
-     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, memoryBackend, mentalModelId, memoryEnabled, sources, enforceCombo, isService, isActive, createdAt, updatedAt, accessRestricted, accessAllow)
+     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, apiKey.comboId, apiKey.soul,
       apiKey.hindsightBankId, apiKey.memoryBackend, apiKey.mentalModelId, apiKey.memoryEnabled ? 1 : 0, serializeSources(apiKey.sources),
-      apiKey.enforceCombo ? 1 : 0, apiKey.isService ? 1 : 0, 1, apiKey.createdAt, apiKey.updatedAt]
+      apiKey.enforceCombo ? 1 : 0, apiKey.isService ? 1 : 0, 1, apiKey.createdAt, apiKey.updatedAt, cols.accessRestricted, cols.accessAllow]
   );
   return apiKey;
 }
@@ -123,14 +136,15 @@ export async function updateApiKey(id, data) {
     if (!row) return;
     const merged = { ...rowToKey(row), ...data };
     merged.updatedAt = new Date().toISOString();
+    const cols = keyAccessToColumns(merged.access);
     db.run(
       `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, comboId = ?, soul = ?,
-       hindsightBankId = ?, memoryBackend = ?, mentalModelId = ?, memoryEnabled = ?, sources = ?, enforceCombo = ?, isService = ?, isActive = ?, updatedAt = ? WHERE id = ?`,
+       hindsightBankId = ?, memoryBackend = ?, mentalModelId = ?, memoryEnabled = ?, sources = ?, enforceCombo = ?, isService = ?, isActive = ?, updatedAt = ?, accessRestricted = ?, accessAllow = ? WHERE id = ?`,
       [merged.key, merged.name, merged.machineId, merged.comboId || null, merged.soul || "",
         merged.hindsightBankId || null, storedMemoryBackend(merged.memoryBackend), merged.mentalModelId || null, merged.memoryEnabled ? 1 : 0, serializeSources(merged.sources),
-        merged.enforceCombo !== false ? 1 : 0, merged.isService ? 1 : 0, merged.isActive ? 1 : 0, merged.updatedAt, id]
+        merged.enforceCombo !== false ? 1 : 0, merged.isService ? 1 : 0, merged.isActive ? 1 : 0, merged.updatedAt, cols.accessRestricted, cols.accessAllow, id]
     );
-    result = merged;
+    result = rowToKey(db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]));
   });
   return result;
 }

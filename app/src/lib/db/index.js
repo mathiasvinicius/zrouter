@@ -1,6 +1,8 @@
 // Public API barrel — all DB functions
 import { getAdapter } from "./driver.js";
 import { stringifyJson, parseJson } from "./helpers/jsonCol.js";
+import { keyAccessFromColumns, keyAccessToColumns, validateKeyAccessInput } from "@/shared/utils/keyAccess.js";
+import { KEY_ACCESS_UNRESTRICTED } from "@/shared/constants/keyAccess.js";
 
 // Settings
 export {
@@ -29,7 +31,7 @@ export {
 
 // API keys
 export {
-  getApiKeys, getApiKeyById, getApiKeyByValue, createApiKey, updateApiKey, deleteApiKey, validateApiKey,
+  getApiKeys, getApiKeyById, getApiKeyByKey, getApiKeyByValue, createApiKey, updateApiKey, deleteApiKey, validateApiKey,
   normalizeKeySources,
 } from "./repos/apiKeysRepo.js";
 
@@ -85,9 +87,11 @@ export async function exportDb() {
       // round-trip keeps the (now Neo4j-only) backend selection.
       memoryBackend: r.memoryBackend,
       mentalModelId: r.mentalModelId, memoryEnabled: r.memoryEnabled === 1,
+      enforceCombo: r.enforceCombo === undefined || r.enforceCombo === null ? true : (r.enforceCombo === 1 || r.enforceCombo === true),
       sources: parseJson(r.sources, {}),
       isService: r.isService === 1, isActive: r.isActive === 1,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
+      access: keyAccessFromColumns(r.accessRestricted, r.accessAllow),
     })),
     combos: db.all(`SELECT * FROM combos`).map((r) => ({ id: r.id, name: r.name, kind: r.kind, models: parseJson(r.models, []), createdAt: r.createdAt, updatedAt: r.updatedAt })),
     modelAliases: {},
@@ -147,14 +151,25 @@ export async function importDb(payload) {
       );
     }
     for (const k of payload.apiKeys || []) {
+      // Per-key access: a backup without `access` (older version) restores
+      // unrestricted, exactly as before; a malformed `access` is refused.
+      let access = KEY_ACCESS_UNRESTRICTED;
+      if (k.access !== undefined) {
+        const checked = validateKeyAccessInput(k.access);
+        if (!checked.ok) throw new Error(`apiKeys ${k.id}: ${checked.error}`);
+        access = checked.value;
+      }
+      const cols = keyAccessToColumns(access);
       db.run(
-        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, mentalModelId, memoryEnabled, sources, isService, isActive, createdAt, updatedAt)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, comboId, soul, hindsightBankId, memoryBackend, mentalModelId, memoryEnabled, enforceCombo, sources, isService, isActive, createdAt, updatedAt, accessRestricted, accessAllow)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [k.id, k.key, k.name || null, k.machineId || null, k.comboId || null, k.soul || "",
-          k.hindsightBankId || null, k.mentalModelId || null, k.memoryEnabled === false ? 0 : 1,
+          k.hindsightBankId || null, k.memoryBackend || null, k.mentalModelId || null, k.memoryEnabled === false ? 0 : 1,
+          k.enforceCombo !== false ? 1 : 0,
           k.sources && typeof k.sources === "object" ? stringifyJson(k.sources) : "{}", k.isService ? 1 : 0,
           k.isActive === false ? 0 : 1, k.createdAt || new Date().toISOString(),
-          k.updatedAt || k.createdAt || new Date().toISOString()]
+          k.updatedAt || k.createdAt || new Date().toISOString(),
+          cols.accessRestricted, cols.accessAllow]
       );
     }
     for (const c of payload.combos || []) {
