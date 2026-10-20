@@ -10,9 +10,11 @@
     },
     "omniroute": {
       "repository": "https://github.com/diegosouzapw/OmniRoute.git",
-      "ref": "release/v3.8.51",
-      "commit": "7a921299",
-      "strategy": "selective-port-only"
+      "ref": "release/v3.8.52",
+      "commit": "c754707d0edf250107a386168d4e324f51b24135",
+      "strategy": "selective-port-only",
+      "lastAudit": "2026-10-20",
+      "auditNote": "Audited: 1375 commits, 0 ports (9router v0.5.104 supersedes core fixes)"
     }
   }
 }
