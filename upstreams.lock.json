@@ -3,8 +3,8 @@
   "upstreams": {
     "9router": {
       "repository": "https://github.com/decolua/9router.git",
-      "ref": "v0.5.99",
-      "commit": "ce4460ef44bf67e8c3b7dc17a86e92b8d0033fa2",
+      "ref": "v0.5.104",
+      "commit": "87a74e1bda3677193c6f71a7e2100c90311f0689",
       "destination": "app/",
       "strategy": "vendored-three-way"
     },
