@@ -4,6 +4,25 @@ Este documento consolida a evolução, marcos arquiteturais, aprimoramentos cust
 
 ---
 
+
+## v0.5.104 (2026-10-20) — ZRouter merge
+
+### Upstream 9router v0.5.104 (38 commits desde v0.5.99)
+- **Novos modelos:** Gemini 4 Argon, Claude Sonnet 5.5, Claude Opus 5.5
+- **Novos providers:** AWS Bedrock (SSO), ElevenLabs Scribe (STT), MiniMax Code, Nous Research OAuth, Netlify relay proxy pool, System One (Cloudflare AI)
+- **CLI:** Hermes audio transcription via 9router, per-profile config, Hermes CLI tools
+- **Dashboard:** Model picker regex/negation search, batch select, provider filtering, mobile layout fixes
+- **Fixes criticos:** Cursor IDE quota tracking, Codex image token usage, Antigravity IDE 2.22.0, Gemini 4 functionResponse ordering, OpenCode free-tier fixes
+- **Quota:** Anchored auto-ping schedule, unified auto-ping mode, Ollama Cloud request volume
+
+### ZRouter Customs preservados
+- 224 arquivos customizados intocados (sources, identity memory, capabilities, etc)
+- Todos os marcadores criticos verificados
+- Docker compose com profiles bundled mantido
+
+### OmniRoute v3.8.52
+- Auditado: 1375 commits, 0 ports (9router v0.5.104 supersedes core fixes)
+
 ## 📌 Visão Geral das Camadas do ZRouter
 
 O ZRouter opera em uma arquitetura de alta disponibilidade e soberania:
