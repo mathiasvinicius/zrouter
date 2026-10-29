@@ -162,6 +162,9 @@ const QUESTIONS = {
   },
 };
 
+// Exposed so scripts/bench-decision-models.mjs benchmarks the exact same schema.
+export const QUESTIONS_FOR_BENCH = QUESTIONS;
+
 // ── Classifier call ────────────────────────────────────────────────────────
 // One call, both answers. Throws on infra failure (timeout/abort/HTTP/JSON) and
 // on an out-of-enum answer; the caller turns every throw into a fail-open.

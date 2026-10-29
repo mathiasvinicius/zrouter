@@ -1,0 +1,37 @@
+export default {
+  id: "agy",
+  priority: 15,
+  alias: "agy",
+  uiAlias: "agy",
+  display: {
+    name: "Antigravity AGY",
+    icon: "rocket_launch",
+    color: "#4285F4",
+    website: "https://antigravity.google",
+  },
+  category: "custom",
+  serviceKinds: ["llm"],
+  transport: {
+    baseUrls: ["http://127.0.0.1:20130/v1"],
+    format: "openai",
+  },
+  models: [
+    { id: "gemini-4-argon", name: "Gemini 4 Argon" },
+    { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)" },
+    { id: "gemini-4-argon-high", name: "Gemini 4 Argon (High)" },
+    { id: "gemini-4-argon-low", name: "Gemini 4 Argon (Low)" },
+    { id: "gemini-3.8-flash-high", name: "Gemini 3.8 Flash (High)" },
+    { id: "gemini-3.8-flash-medium", name: "Gemini 3.8 Flash (Medium)" },
+    { id: "gemini-3.8-flash-low", name: "Gemini 3.8 Flash (Low)" },
+    { id: "claude-opus-5-5-high", name: "Claude Opus 5.5 (High)" },
+    { id: "claude-opus-5-5-medium", name: "Claude Opus 5.5 (Medium)" },
+    { id: "claude-opus-5-5-low", name: "Claude Opus 5.5 (Low)" },
+    { id: "claude-sonnet-5-5-high", name: "Claude Sonnet 5.5 (High)" },
+    { id: "claude-sonnet-5-5-medium", name: "Claude Sonnet 5.5 (Medium)" },
+    { id: "claude-sonnet-5-5-low", name: "Claude Sonnet 5.5 (Low)" },
+    { id: "gpt-oss-120b-medium", name: "GPT-OSS 120B (Medium)" },
+  ],
+  features: {
+    usage: true,
+  },
+};

@@ -662,6 +662,20 @@ function isCommandCodeTextOnly(model) {
   }
   return false;
 }
+
+// Gemini 4 (Argon / Argo) dropped the classic sampling params — forwarding
+// temperature / top_p / top_k makes the upstream return 400. It also expects
+// functionResponse parts to trail the rest of the turn, so the normalizer
+// reorders them. Both behaviours hang off this single predicate.
+export function isGemini4Model(model) {
+  if (!model) return false;
+  const key = String(model).toLowerCase();
+  // Strip vendor prefix: "google/gemini-4-argon" -> "gemini-4-argon".
+  const base = key.includes("/") ? key.slice(key.lastIndexOf("/") + 1) : key;
+  // The Antigravity ids carry a tier suffix: gemini-4-argon-high|-medium|-low.
+  const id = base.replace(/-(high|medium|low)$/, "");
+  return id === "gemini-4-argon" || id === "gemini-4-argo" || base.startsWith("gemini-4-argon-");
+}
 export function getCapabilitiesForModel(provider, model) {
   if (!model) return { ...DEFAULT_CAPABILITIES };
 
