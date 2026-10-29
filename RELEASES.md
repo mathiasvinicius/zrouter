@@ -5,6 +5,38 @@ Este documento consolida a evolução, marcos arquiteturais, aprimoramentos cust
 ---
 
 
+---
+
+## v0.5.112 (2026-10-29) — ZRouter merge (cron Update-Zrouter)
+
+### Upstream 9router v0.5.112 (tags v0.5.109 → v0.5.112 desde v0.5.104)
+- **Smart Router (System One):** combo com session stickiness adaptativa + decision models (clef/clef-flash no Ollama)
+- **Novos providers/tiers:** Gemini 4 Argon tiers (alt/medium/low) no Antigravity hub/2.24.0, Kimi K3.1 Pro, Runcrate, Nace Drex, SenseNova, Ollama Local TTS (Phonon), embedding adapter Ollama
+- **Novos providers de code:** CommandCode headers 1.88.0, MiniMax Code lease auth (desktop named-pipe broker), Codex GPT-6.1 Terra
+- **Fixes críticos:** DeepSeek PoW via noble-hashes, rejeição de SSE em respostas non-streaming, protobuf Gemini (type predicates), NVIDIA NIM reasoning aliases normalizados, bulk-add LLM|id|secret como token opaco, Copilot thinking p/ ids pontilhados (Claude 5.5), combos avançam em 4xx request-scoped, peek de conteúdo em respostas 2xx vazias (empty failover)
+- **Dashboard:** Smart Router, busca de combos, AutoPing schedule, WebLogin/MinimaxLease, limites de provider com currency/unit
+
+### Recuperação de perdas do merge v0.5.99→v0.5.104 (latent)
+- **executors/cursor.js** tinha ficado na era v0.5.99: recomposto com upstream v0.5.112 (strict-proxy guard fail-closed, empty-turn recovery com runWithRetry + tailOnlyCursorMessages, auto-model resolution, export encodeKvClientMessage) preservando o custom ZRouter de end-of-stream trailer (connectEndStreamError)
+- **capabilities.js** idem: restaurados #2690 (OpenCode Free ids: space-bunny/big-pickle/longcat/etc), entradas `nous` Research, patterns Claude com pdf:true; mantidos customs (isGemini4Model predicate Argon/Argo, pattern `*gemini-4*`, glm-5.2 1M)
+
+### Customs ZRouter desta release
+- Provider `agy` (registry) apontando para o bridge AGY local (127.0.0.1:20130/v1) com tiers Gemini 4 Argon + Claude 5.5
+- antigravity.js: tiers Argon com `upstreamModelId` mapeado; dedupe com o trio upstream; mantidos `gemini-4-argon` e `gemini-4-argo`
+- combo.js: peek 2xx/requestScoped do upstream + preservação do 410 fall-through local (47248007)
+- chatCore.js: assinatura unida (identityContext/comboThinkingLevel/cacheControlMode + customPrompt) e `upstreamModel` via getModelUpstreamId antes do bloco de combo
+- golden-url-header.test.js: sanitização determinística (uuid→<UUID>, versões→<V>/<NODEV>, timezone-offset) — snapshot não depende mais de máquina/versão (divergência local documentada, upstream ainda vermelho em codebuddy)
+- combos/page.js: `import Link from "next/link"` (upstream usa <Link> sem importar — quebraria o build Next local)
+
+### Validação
+- Suite vendored (vitest): **2145/2418 pass**, 150 falhando — upstream puro roda 2112/2357 (89.6%)
+- Regressões do merge zereadas (cursor 15, thinking 1, golden snapshots, react-components, capabilities #2690): 19/19 verdes
+- Falhas restantes: 122 herdadas do upstream (inclui combo-credit-fallback "Bad request", test/código inconsistentes no próprio 9router) + 28 conhecidas de divergência de customs (memory-backend, model-auto-sync, model-discover, sources-migration, color-themes, claude-context/empty-thinking, minimax-transport)
+- Audit-customs: 227 modificados / 88 adicionados vs base v0.5.112 · markers OK · baseline JSON válido
+
+### OmniRoute v3.8.52
+- Re-auditado em 2026-10-29: sem release novo desde 3.8.52 (última tag v3.8.52). Continua selective-port-only, 0 ports (9router v0.5.112 supera os core fixes)
+
 ## v0.5.104 (2026-10-20) — ZRouter merge
 
 ### Upstream 9router v0.5.104 (38 commits desde v0.5.99)

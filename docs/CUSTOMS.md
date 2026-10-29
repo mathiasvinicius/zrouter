@@ -1,7 +1,7 @@
 # CUSTOMS — o que o ZRouter mudou em relação ao upstream
 
-> **Gerado automaticamente** por `scripts/update/audit-customs.mjs` em 2026-09-19 21:39:12.
-> Base: `v0.5.81` (raiz do upstream 9Router) · comparada contra `app/` · HEAD `5e00db5f`
+> **Gerado automaticamente** por `scripts/update/audit-customs.mjs` em 2026-10-29 12:24:36.
+> Base: `zrouter-base-v0.5.112` (raiz do upstream 9Router) · comparada contra `app/` · HEAD `61928339`
 >
 > **Não edite à mão.** Este documento é a memória do fork: a pipeline
 > (`docs/UPDATE-PIPELINE.md`) o consulta ao resolver conflitos de merge.
@@ -9,14 +9,14 @@
 
 ## Resumo
 
-- **Modificados** (existem no upstream): **216** — onde um merge disputa conteúdo
-- **Adicionados** (só nossos): 80
-- **Removidos** (no upstream, não em nós): 145
+- **Modificados** (existem no upstream): **227** — onde um merge disputa conteúdo
+- **Adicionados** (só nossos): 88
+- **Removidos** (no upstream, não em nós): 0
 
 O risco de um update mora nos **modificados**. Adicionados e removidos normalmente
 resolvem sozinhos.
 
-## Modificados (216) — pontos de acoplamento
+## Modificados (227) — pontos de acoplamento
 
 ### `public/i18n` (34)
 
@@ -66,27 +66,27 @@ resolvem sozinhos.
 - `src/app/api/cli-tools/deepseek-tui-settings/route.js` — +4/-4
 - `src/app/api/cli-tools/droid-settings/route.js` — +6/-6
 - `src/app/api/cli-tools/grok-build-settings/route.js` — +1/-1
-- `src/app/api/cli-tools/hermes-settings/route.js` — +1/-1
 - `src/app/api/cli-tools/jcode-settings/route.js` — +2/-2
 - `src/app/api/cli-tools/kilo-settings/route.js` — +2/-2
 - `src/app/api/cli-tools/openclaw-settings/route.js` — +9/-9
 - `src/app/api/cli-tools/opencode-settings/route.js` — +5/-5
+- `src/app/api/combos/route.js` — +7/-1
 - `src/app/api/headroom/restart/route.js` — +1/-1
 - `src/app/api/headroom/start/route.js` — +1/-1
-- `src/app/api/keys/[id]/route.js` — +37/-4
-- `src/app/api/keys/route.js` — +35/-4
-- `src/app/api/models/route.js` — +3/-0
-- `src/app/api/oauth/[provider]/[action]/route.js` — +0/-0
-- `src/app/api/providers/[id]/test/testUtils.js` — +1/-1
+- `src/app/api/keys/[id]/route.js` — +38/-5
+- `src/app/api/keys/route.js` — +36/-4
+- `src/app/api/models/route.js` — +6/-14
+- `src/app/api/oauth/[provider]/[action]/route.js` — +1/-2
+- `src/app/api/providers/[id]/test/testUtils.js` — +6/-32
 - `src/app/api/settings/route.js` — +14/-5
 - `src/app/api/usage/chart/route.js` — +6/-1
 - `src/app/api/usage/history/route.js` — +6/-2
 - `src/app/api/usage/stats/route.js` — +2/-1
-- `src/app/api/v1/models/route.js` — +45/-3
+- `src/app/api/v1/models/route.js` — +50/-18
 - `src/app/api/version/route.js` — +1/-1
 - `src/app/api/version/update/route.js` — +1/-1
 
-### `src/app/(dashboard)` (23)
+### `src/app/(dashboard)` (25)
 
 - `src/app/(dashboard)/dashboard/cli-tools/components/AntigravityToolCard.js` — +3/-3
 - `src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js` — +1/-1
@@ -102,34 +102,37 @@ resolvem sozinhos.
 - `src/app/(dashboard)/dashboard/cli-tools/components/MitmToolCard.js` — +1/-1
 - `src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js` — +1/-1
 - `src/app/(dashboard)/dashboard/cli-tools/components/OpenCodeToolCard.js` — +1/-1
-- `src/app/(dashboard)/dashboard/combos/page.js` — +37/-5
-- `src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js` — +238/-26
+- `src/app/(dashboard)/dashboard/combos/page.js` — +165/-20
+- `src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js` — +264/-32
 - `src/app/(dashboard)/dashboard/profile/page.js` — +4/-4
-- `src/app/(dashboard)/dashboard/providers/[id]/ConnectionRow.js` — +33/-0
-- `src/app/(dashboard)/dashboard/providers/[id]/page.js` — +61/-2
+- `src/app/(dashboard)/dashboard/providers/[id]/ConnectionRow.js` — +52/-64
+- `src/app/(dashboard)/dashboard/providers/[id]/page.js` — +67/-23
 - `src/app/(dashboard)/dashboard/skills/page.js` — +17/-13
-- `src/app/(dashboard)/dashboard/token-saver/TokenSaverClient.js` — +58/-2
+- `src/app/(dashboard)/dashboard/token-saver/TokenSaverClient.js` — +65/-2
+- `src/app/(dashboard)/dashboard/usage/components/OverviewCards.js` — +1/-0
+- `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.js` — +6/-26
 - `src/app/(dashboard)/dashboard/usage/components/ProviderTopology.js` — +3/-3
-- `src/app/(dashboard)/dashboard/usage/components/UsageChart.js` — +35/-9
+- `src/app/(dashboard)/dashboard/usage/components/UsageChart.js` — +52/-15
 
-### `src/lib` (23)
+### `src/lib` (24)
 
 - `src/lib/appUpdater.js` — +3/-3
-- `src/lib/db/index.js` — +20/-4
+- `src/lib/db/index.js` — +24/-4
 - `src/lib/db/migrate.js` — +8/-2
-- `src/lib/db/migrations/index.js` — +4/-1
+- `src/lib/db/migrations/index.js` — +5/-1
 - `src/lib/db/repos/aliasRepo.js` — +6/-3
-- `src/lib/db/repos/apiKeysRepo.js` — +68/-5
-- `src/lib/db/repos/settingsRepo.js` — +25/-0
-- `src/lib/db/repos/usageRepo.js` — +212/-82
-- `src/lib/db/schema.js` — +16/-2
+- `src/lib/db/repos/apiKeysRepo.js` — +72/-7
+- `src/lib/db/repos/combosRepo.js` — +45/-5
+- `src/lib/db/repos/settingsRepo.js` — +11/-0
+- `src/lib/db/repos/usageRepo.js` — +225/-99
+- `src/lib/db/schema.js` — +21/-2
 - `src/lib/grokBuildConfig.js` — +3/-3
 - `src/lib/headroom/detect.js` — +1/-1
 - `src/lib/localDb.js` — +1/-1
 - `src/lib/mcp/stdioSseBridge.js` — +3/-3
 - `src/lib/modelCatalog/sync.js` — +3/-4
 - `src/lib/network/proxyTest.js` — +1/-1
-- `src/lib/oauth/constants/oauth.js` — +1/-0
+- `src/lib/oauth/constants/oauth.js` — +1/-10
 - `src/lib/oauth/constants/xai.js` — +1/-1
 - `src/lib/oauth/providers/trae.js` — +1/-1
 - `src/lib/oauth/providers/xiaomi-mimo.js` — +1/-1
@@ -142,16 +145,16 @@ resolvem sozinhos.
 
 - `src/shared/components/DonateModal.js` — +1/-1
 - `src/shared/components/Header.js` — +2/-2
-- `src/shared/components/ModelSelectModal.js` — +1/-1
+- `src/shared/components/ModelSelectModal.js` — +52/-213
 - `src/shared/components/Sidebar.js` — +11/-28
 - `src/shared/components/ThemeToggle.js` — +58/-15
-- `src/shared/components/UsageStats.js` — +19/-4
+- `src/shared/components/UsageStats.js` — +28/-13
 - `src/shared/components/index.js` — +0/-1
-- `src/shared/constants/cliTools.js` — +13/-13
-- `src/shared/constants/config.js` — +3/-3
+- `src/shared/constants/cliTools.js` — +14/-14
+- `src/shared/constants/config.js` — +5/-5
 - `src/shared/constants/skills.js` — +30/-29
-- `src/shared/hooks/useModelCaps.js` — +10/-4
-- `src/shared/services/initializeApp.js` — +6/-0
+- `src/shared/hooks/useModelCaps.js` — +10/-10
+- `src/shared/services/initializeApp.js` — +8/-6
 
 ### `cli/src` (7)
 
@@ -165,11 +168,11 @@ resolvem sozinhos.
 
 ### `open-sse/providers` (7)
 
-- `open-sse/providers/capabilities.js` — +2/-1
-- `open-sse/providers/registry/antigravity.js` — +0/-2
+- `open-sse/providers/capabilities.js` — +12/-3
+- `open-sse/providers/registry/antigravity.js` — +7/-2
 - `open-sse/providers/registry/fireworks.js` — +1/-0
-- `open-sse/providers/registry/gemini-cli.js` — +0/-2
-- `open-sse/providers/registry/gemini.js` — +0/-2
+- `open-sse/providers/registry/gemini-cli.js` — +1/-2
+- `open-sse/providers/registry/gemini.js` — +0/-3
 - `open-sse/providers/registry/windsurf.js` — +1/-1
 - `open-sse/providers/shared.js` — +11/-7
 
@@ -193,36 +196,46 @@ resolvem sozinhos.
 - `src/mitm/manager.js` — +2/-2
 - `src/mitm/server.js` — +1/-1
 
-### `open-sse/handlers` (6)
-
-- `open-sse/handlers/chatCore.js` — +50/-12
-- `open-sse/handlers/chatCore/nonStreamingHandler.js` — +2/-1
-- `open-sse/handlers/chatCore/sseToJsonHandler.js` — +3/-1
-- `open-sse/handlers/chatCore/streamingHandler.js` — +11/-2
-- `open-sse/handlers/ttsProviders/selfhostedTts.js` — +1/-1
-- `open-sse/handlers/videoProviders/vertex.js` — +1/-1
-
-### `open-sse/translator` (5)
-
-- `open-sse/translator/formats/claude.js` — +38/-13
-- `open-sse/translator/index.js` — +8/-3
-- `open-sse/translator/request/claude-to-kiro.js` — +1/-1
-- `open-sse/translator/request/openai-to-kiro.js` — +1/-1
-- `open-sse/translator/response/commandcode-to-openai.js` — +1/-1
-
-### `tests/unit` (5)
+### `tests/unit` (7)
 
 - `tests/unit/antigravity-oauth-client.test.js` — +45/-27
 - `tests/unit/codex-native-passthrough-thinking.test.js` — +8/-1
 - `tests/unit/commandcode-executor.test.js` — +0/-1
 - `tests/unit/db-sqlite-vs-lowdb.test.js` — +3/-2
+- `tests/unit/key-access-handlers.test.js` — +4/-2
 - `tests/unit/kimchi-strip-reasoning.test.js` — +1/-1
+- `tests/unit/v1-models-combo-context.test.js` — +5/-0
+
+### `open-sse/handlers` (6)
+
+- `open-sse/handlers/chatCore.js` — +53/-17
+- `open-sse/handlers/chatCore/nonStreamingHandler.js` — +32/-2
+- `open-sse/handlers/chatCore/sseToJsonHandler.js` — +4/-7
+- `open-sse/handlers/chatCore/streamingHandler.js` — +11/-2
+- `open-sse/handlers/ttsProviders/selfhostedTts.js` — +1/-1
+- `open-sse/handlers/videoProviders/vertex.js` — +1/-1
+
+### `open-sse/services` (5)
+
+- `open-sse/services/combo.js` — +7/-27
+- `open-sse/services/kiroModels.js` — +4/-4
+- `open-sse/services/tokenRefresh.js` — +16/-6
+- `open-sse/services/tokenRefresh/providers.js` — +2/-50
+- `open-sse/services/usage/misc.js` — +13/-34
+
+### `open-sse/translator` (5)
+
+- `open-sse/translator/formats/claude.js` — +39/-30
+- `open-sse/translator/index.js` — +8/-3
+- `open-sse/translator/request/claude-to-kiro.js` — +1/-1
+- `open-sse/translator/request/openai-to-kiro.js` — +1/-1
+- `open-sse/translator/response/commandcode-to-openai.js` — +1/-1
 
 ### `open-sse/executors` (4)
 
 - `open-sse/executors/codebuddy-cn.js` — +2/-2
 - `open-sse/executors/commandcode.js` — +1/-1
-- `open-sse/executors/cursor.js` — +3/-3
+- `open-sse/executors/cursor.js` — +27/-2
 - `open-sse/executors/devin-cli.js` — +1/-1
 
 ### `open-sse/shared` (4)
@@ -253,7 +266,7 @@ resolvem sozinhos.
 ### `open-sse/rtk` (3)
 
 - `open-sse/rtk/constants.js` — +6/-0
-- `open-sse/rtk/headroom.js` — +1/-1
+- `open-sse/rtk/headroom.js` — +5/-6
 - `open-sse/rtk/index.js` — +34/-10
 
 ### `cli/scripts` (2)
@@ -266,11 +279,6 @@ resolvem sozinhos.
 - `open-sse/config/errorConfig.js` — +3/-0
 - `open-sse/config/kiroConstants.js` — +6/-6
 
-### `open-sse/services` (2)
-
-- `open-sse/services/combo.js` — +7/-1
-- `open-sse/services/kiroModels.js` — +4/-4
-
 ### `public/icons` (2)
 
 - `public/icons/icon-192.svg` — +9/-2
@@ -278,8 +286,18 @@ resolvem sozinhos.
 
 ### `src` (2)
 
-- `src/dashboardGuard.js` — +1/-1
+- `src/dashboardGuard.js` — +1/-0
 - `src/instrumentation.js` — +6/-0
+
+### `src/sse` (2)
+
+- `src/sse/handlers/chat.js` — +105/-21
+- `src/sse/services/auth.js` — +8/-3
+
+### `tests/translator` (2)
+
+- `tests/translator/__snapshots__/golden-url-header.test.js.snap` — +91/-43
+- `tests/translator/golden-url-header.test.js` — +6/-1
 
 ### `.env.example` (1)
 
@@ -295,15 +313,15 @@ resolvem sozinhos.
 
 ### `DOCKER.md` (1)
 
-- `DOCKER.md` — +18/-18
+- `DOCKER.md` — +19/-21
 
 ### `Dockerfile` (1)
 
-- `Dockerfile` — +4/-2
+- `Dockerfile` — +6/-0
 
 ### `README.md` (1)
 
-- `README.md` — +32/-15
+- `README.md` — +32/-25
 
 ### `custom-server.js` (1)
 
@@ -323,7 +341,7 @@ resolvem sozinhos.
 
 ### `package.json` (1)
 
-- `package.json` — +2/-2
+- `package.json` — +5/-5
 
 ### `public` (1)
 
@@ -349,10 +367,6 @@ resolvem sozinhos.
 
 - `src/app/manifest.js` — +2/-2
 
-### `src/sse` (1)
-
-- `src/sse/handlers/chat.js` — +68/-18
-
 ### `src/store` (1)
 
 - `src/store/themeStore.js` — +24/-1
@@ -367,13 +381,14 @@ resolvem sozinhos.
 
 ### `tests/__baseline__` (1)
 
-- `tests/__baseline__/providers-baseline.json` — +0/-14
+- `tests/__baseline__/providers-baseline.json` — +3/-18
 
-## Adicionados (80) — arquivos nossos
+## Adicionados (88) — arquivos nossos
 
-### `tests/unit` (26)
+### `tests/unit` (29)
 
 - `tests/unit/api-key-profile-options.test.js`
+- `tests/unit/cache-metrics-route.test.js`
 - `tests/unit/cache-metrics-token-shapes.test.js`
 - `tests/unit/cache-policy.test.js`
 - `tests/unit/capabilities-block.test.js`
@@ -390,6 +405,8 @@ resolvem sozinhos.
 - `tests/unit/neo4j-trivial-memory.test.js`
 - `tests/unit/notebook-scope-endpoint.test.js`
 - `tests/unit/notebook-scope-filter.test.js`
+- `tests/unit/notion-backend.test.js`
+- `tests/unit/react-component-imports.test.js`
 - `tests/unit/react-hook-imports.test.js`
 - `tests/unit/rtk-responses-output.test.js`
 - `tests/unit/sources-contract.test.js`
@@ -400,7 +417,7 @@ resolvem sozinhos.
 - `tests/unit/sources-status.test.js`
 - `tests/unit/usage-by-api-key.test.js`
 
-### `src/lib` (16)
+### `src/lib` (17)
 
 - `src/lib/cacheMetrics.js`
 - `src/lib/cacheTokenShapes.js`
@@ -409,6 +426,7 @@ resolvem sozinhos.
 - `src/lib/db/migrations/002-api-key-sources.js`
 - `src/lib/db/migrations/003-custom-model-source.js`
 - `src/lib/db/migrations/004-memory-backend-neo4j.js`
+- `src/lib/db/migrations/005-dynamic-combos.js`
 - `src/lib/db/repos/modelDiscoveryRepo.js`
 - `src/lib/identityMemory/common.js`
 - `src/lib/identityMemory/index.js`
@@ -419,7 +437,7 @@ resolvem sozinhos.
 - `src/lib/modelSync.js`
 - `src/lib/sources/context.js`
 
-### `src/app/api` (8)
+### `src/app/api` (9)
 
 - `src/app/api/health/neo4j/route.js`
 - `src/app/api/keys/[id]/memories/route.js`
@@ -429,6 +447,7 @@ resolvem sozinhos.
 - `src/app/api/sources/open-notebook/notebooks/route.js`
 - `src/app/api/sources/status/route.js`
 - `src/app/api/usage/cache-metrics/route.js`
+- `src/app/api/v1/skills/route.js`
 
 ### `src/app/(dashboard)` (6)
 
@@ -446,6 +465,12 @@ resolvem sozinhos.
 - `open-sse/sources/notionBackend.js`
 - `open-sse/sources/openNotebookBackend.js`
 - `open-sse/sources/status.js`
+
+### `open-sse/providers` (3)
+
+- `open-sse/providers/capabilities.js.bak-1792526314`
+- `open-sse/providers/registry/agy.js`
+- `open-sse/providers/registry/antigravity.js.bak-1792522054`
 
 ### `src/shared` (3)
 
@@ -509,161 +534,13 @@ resolvem sozinhos.
 
 - `skills/zrouter-web-search/SKILL.md`
 
+### `src/sse` (1)
+
+- `src/sse/services/dynamicRouter.js`
+
 ### `tests` (1)
 
 - `tests/package-lock.json`
-
-### `tests/translator` (1)
-
-- `tests/translator/__snapshots__/golden-url-header.test.js.snap`
-
-## Removidos (145)
-
-- `.github/workflows/gitbook-pages.yml`
-- `README.zh-CN.md`
-- `docker-compose.yml`
-- `gitbook/.gitignore`
-- `gitbook/app/[lang]/[...slug]/page.js`
-- `gitbook/app/[lang]/page.js`
-- `gitbook/app/globals.css`
-- `gitbook/app/layout.js`
-- `gitbook/app/page.js`
-- `gitbook/components/DocsContent.js`
-- `gitbook/components/DocsHeader.js`
-- `gitbook/components/DocsLayout.js`
-- `gitbook/components/DocsSidebar.js`
-- `gitbook/components/DocsToc.js`
-- `gitbook/components/LanguageSwitcher.js`
-- `gitbook/constants/docsConfig.js`
-- `gitbook/constants/languages.js`
-- `gitbook/content/en/deployment/cloud.md`
-- `gitbook/content/en/deployment/localhost.md`
-- `gitbook/content/en/faq.md`
-- `gitbook/content/en/features/combos.md`
-- `gitbook/content/en/features/quota-tracking.md`
-- `gitbook/content/en/features/smart-routing.md`
-- `gitbook/content/en/getting-started/installation.md`
-- `gitbook/content/en/getting-started/quick-start.md`
-- `gitbook/content/en/index.md`
-- `gitbook/content/en/integration/claude-code.md`
-- `gitbook/content/en/integration/cline.md`
-- `gitbook/content/en/integration/codex.md`
-- `gitbook/content/en/integration/continue.md`
-- `gitbook/content/en/integration/cursor.md`
-- `gitbook/content/en/integration/other-tools.md`
-- `gitbook/content/en/integration/roo.md`
-- `gitbook/content/en/providers/cheap.md`
-- `gitbook/content/en/providers/free.md`
-- `gitbook/content/en/providers/subscription.md`
-- `gitbook/content/en/troubleshooting.md`
-- `gitbook/content/es/deployment/cloud.md`
-- `gitbook/content/es/deployment/localhost.md`
-- `gitbook/content/es/faq.md`
-- `gitbook/content/es/features/combos.md`
-- `gitbook/content/es/features/quota-tracking.md`
-- `gitbook/content/es/features/smart-routing.md`
-- `gitbook/content/es/getting-started/installation.md`
-- `gitbook/content/es/getting-started/quick-start.md`
-- `gitbook/content/es/index.md`
-- `gitbook/content/es/integration/claude-code.md`
-- `gitbook/content/es/integration/cline.md`
-- `gitbook/content/es/integration/codex.md`
-- `gitbook/content/es/integration/continue.md`
-- `gitbook/content/es/integration/cursor.md`
-- `gitbook/content/es/integration/other-tools.md`
-- `gitbook/content/es/integration/roo.md`
-- `gitbook/content/es/providers/cheap.md`
-- `gitbook/content/es/providers/free.md`
-- `gitbook/content/es/providers/subscription.md`
-- `gitbook/content/es/troubleshooting.md`
-- `gitbook/content/ja/deployment/cloud.md`
-- `gitbook/content/ja/deployment/localhost.md`
-- `gitbook/content/ja/faq.md`
-- `gitbook/content/ja/features/combos.md`
-- `gitbook/content/ja/features/quota-tracking.md`
-- `gitbook/content/ja/features/smart-routing.md`
-- `gitbook/content/ja/getting-started/installation.md`
-- `gitbook/content/ja/getting-started/quick-start.md`
-- `gitbook/content/ja/index.md`
-- `gitbook/content/ja/integration/claude-code.md`
-- `gitbook/content/ja/integration/cline.md`
-- `gitbook/content/ja/integration/codex.md`
-- `gitbook/content/ja/integration/continue.md`
-- `gitbook/content/ja/integration/cursor.md`
-- `gitbook/content/ja/integration/other-tools.md`
-- `gitbook/content/ja/integration/roo.md`
-- `gitbook/content/ja/providers/cheap.md`
-- `gitbook/content/ja/providers/free.md`
-- `gitbook/content/ja/providers/subscription.md`
-- `gitbook/content/ja/troubleshooting.md`
-- `gitbook/content/vi/deployment/cloud.md`
-- `gitbook/content/vi/deployment/localhost.md`
-- `gitbook/content/vi/faq.md`
-- `gitbook/content/vi/features/combos.md`
-- `gitbook/content/vi/features/quota-tracking.md`
-- `gitbook/content/vi/features/smart-routing.md`
-- `gitbook/content/vi/getting-started/installation.md`
-- `gitbook/content/vi/getting-started/quick-start.md`
-- `gitbook/content/vi/index.md`
-- `gitbook/content/vi/integration/claude-code.md`
-- `gitbook/content/vi/integration/cline.md`
-- `gitbook/content/vi/integration/codex.md`
-- `gitbook/content/vi/integration/continue.md`
-- `gitbook/content/vi/integration/cursor.md`
-- `gitbook/content/vi/integration/other-tools.md`
-- `gitbook/content/vi/integration/roo.md`
-- `gitbook/content/vi/providers/cheap.md`
-- `gitbook/content/vi/providers/free.md`
-- `gitbook/content/vi/providers/subscription.md`
-- `gitbook/content/vi/troubleshooting.md`
-- `gitbook/content/zh-CN/deployment/cloud.md`
-- `gitbook/content/zh-CN/deployment/localhost.md`
-- `gitbook/content/zh-CN/faq.md`
-- `gitbook/content/zh-CN/features/combos.md`
-- `gitbook/content/zh-CN/features/quota-tracking.md`
-- `gitbook/content/zh-CN/features/smart-routing.md`
-- `gitbook/content/zh-CN/getting-started/installation.md`
-- `gitbook/content/zh-CN/getting-started/quick-start.md`
-- `gitbook/content/zh-CN/index.md`
-- `gitbook/content/zh-CN/integration/claude-code.md`
-- `gitbook/content/zh-CN/integration/cline.md`
-- `gitbook/content/zh-CN/integration/codex.md`
-- `gitbook/content/zh-CN/integration/continue.md`
-- `gitbook/content/zh-CN/integration/cursor.md`
-- `gitbook/content/zh-CN/integration/other-tools.md`
-- `gitbook/content/zh-CN/integration/roo.md`
-- `gitbook/content/zh-CN/providers/cheap.md`
-- `gitbook/content/zh-CN/providers/free.md`
-- `gitbook/content/zh-CN/providers/subscription.md`
-- `gitbook/content/zh-CN/troubleshooting.md`
-- `gitbook/jsconfig.json`
-- `gitbook/lib/content.js`
-- `gitbook/next.config.mjs`
-- `gitbook/package.json`
-- `gitbook/postcss.config.mjs`
-- `gitbook/utils/markdown.js`
-- `i18n/README.es.md`
-- `i18n/README.fa_IR.md`
-- `i18n/README.fr.md`
-- `i18n/README.id-ID.md`
-- `i18n/README.ja-JP.md`
-- `i18n/README.pt-BR.md`
-- `i18n/README.ru.md`
-- `i18n/README.th.md`
-- `i18n/README.vi.md`
-- `i18n/README.zh-CN.md`
-- `scripts/translate-readme.js`
-- `skills/9router-chat/SKILL.md`
-- `skills/9router-embeddings/SKILL.md`
-- `skills/9router-image/SKILL.md`
-- `skills/9router-stt/SKILL.md`
-- `skills/9router-tts/SKILL.md`
-- `skills/9router-video/SKILL.md`
-- `skills/9router-web-fetch/SKILL.md`
-- `skills/9router-web-search/SKILL.md`
-- `skills/9router/SKILL.md`
-- `src/shared/components/NineRemoteButton.js`
-- `src/shared/components/NineRemotePromoModal.js`
 
 ## Marcadores que provam que um custom sobreviveu
 

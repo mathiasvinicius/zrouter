@@ -118,7 +118,7 @@ export function keyAccessDeniedResponse(ctx, requested) {
 /**
  * Gate for endpoints whose `model` may be a combo or a model (chat, image, tts).
  * Call with the requested string BEFORE combo expansion.
- * @returns {Promise<Response|null>} a 403 Response, or null when allowed.
+ * @returns {Promise} a 403 HTTP response object, or null when allowed.
  */
 export async function enforceKeyAccess(ctx, requested) {
   if (!ctx) return null;

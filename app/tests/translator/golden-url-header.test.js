@@ -24,7 +24,7 @@ const SPECIALIZED = new Set([
 ]);
 
 // Per-process / per-request values: kimi's random device name, minimax's session UUID.
-const VOLATILE_HEADERS = new Set(["x-msh-device-name", "x-mavis-session-id"]);
+const VOLATILE_HEADERS = new Set(["x-msh-device-name", "x-mavis-session-id", "x-mavis-timezone-offset"]);
 
 // Sanitize header: khử token + field thời gian động (kimi X-Msh-Device-Id) để snapshot ổn định.
 function sanitize(headers) {
@@ -35,6 +35,11 @@ function sanitize(headers) {
       ? v.replace(/Bearer .+/, "Bearer <TOK>")
           .replace(/sk-test-APIKEY|tok-test-ACCESS/g, "<CRED>")
           .replace(/kimi-\d{10,}/g, "kimi-<TS>")
+          // ZRouter: valores dependentes de máquina/processo -> snapshot determinístico.
+          .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, "<UUID>")
+          .replace(/^v\d+\.\d+\.\d+$/, "<NODEV>")
+          .replace(/9Router\/\d+\.\d+\.\d+/, "9Router/<V>")
+          .replace(/^(\d+\.\d+\.\d+)$/, "<V>")
       : v;
   }
   return out;
