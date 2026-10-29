@@ -4,6 +4,15 @@ Este documento consolida a evolução, marcos arquiteturais, aprimoramentos cust
 
 ---
 
+## v0.5.112-p1 (2026-10-29) — Expurgo de telemetria/phone-home do WebGUI
+
+Auditoria do cron de manutenção identificou três chamadas externas não autorizadas na WebGUI, todas removidas:
+
+- **`GET /api/version` → registry.npmjs.org/zrouter/latest**: o endpoint consultava o npm por um pacote homônimo ("zrouter" 0.0.2) e reportava `hasUpdate: true` falso, além de expor o gateway a um phone-home de terceiros. Agora o endpoint é 100% offline: `currentVersion = latestVersion = pkg.version`, `hasUpdate: false`. Atualizações são decididas localmente pelo pipeline de merge (`bases/` + `upstreams.lock.json`).
+- **`DonateModal` → `https://9router.com/api/donate`**: modal de doação do upstream removido junto com o componente (138 linhas), o import, o estado e o botão no `Header`.
+- **`ChangelogModal` → raw.githubusercontent.com/decolua/9router/CHANGELOG.md**: fetch externo desativado; o modal agora aponta o `RELEASES.md` local, sem requisição de rede.
+
+Validação pós-deploy: `/api/version` retorna 0.5.112 sem rede; login 200; 14/14 assets `/_next/static` em 200; zero domínios externos e zero iframes no HTML servido; nenhum chunk construído referencia `9router.com`, `registry.npmjs.org` ou `api/donate`.
 
 ---
 

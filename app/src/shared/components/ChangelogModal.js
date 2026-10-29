@@ -13,6 +13,11 @@ export default function ChangelogModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!isOpen || html) return;
+    // ZRouter: changelog é local — nenhum fetch externo.
+    if (!GITHUB_CONFIG.changelogUrl) {
+      setError("Changelog local: veja RELEASES.md no repositório do ZRouter.");
+      return;
+    }
     setLoading(true);
     setError("");
     Promise.all([
