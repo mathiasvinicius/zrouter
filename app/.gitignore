@@ -114,3 +114,4 @@ debug.log
 jwt-secret*
 *-entrega*.log
 tmp/
+.scratch/

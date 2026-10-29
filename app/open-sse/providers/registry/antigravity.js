@@ -43,6 +43,9 @@ export default {
     },
   },
   models: [
+    { id: "gemini-4-argon-high", name: "Gemini 4 Argon (High)", upstreamModelId: "gemini-4-argon-high(high)" },
+    { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)", upstreamModelId: "gemini-4-argon-medium(medium)" },
+    { id: "gemini-4-argon-low", name: "Gemini 4 Argon (Low)", upstreamModelId: "gemini-4-argon-low(low)" },
     { id: "gemini-3.8-flash-high", name: "Gemini 3.8 Flash (High)", upstreamModelId: "gemini-3.8-flash-high(high)" },
     { id: "gemini-3.8-flash-medium", name: "Gemini 3.8 Flash (Medium)", upstreamModelId: "gemini-3.8-flash-medium(medium)" },
     { id: "gemini-3.8-flash-low", name: "Gemini 3.8 Flash (Low)", upstreamModelId: "gemini-3.8-flash-low(low)" },
@@ -71,9 +74,6 @@ export default {
     { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6 (Thinking)" },
     { id: "claude-opus-4-6-thinking", name: "Claude Opus 4.6 (Thinking)" },
     { id: "gpt-oss-120b-medium", name: "GPT-OSS 120B (Medium)" },
-    { id: "gemini-4-argon-high", name: "Gemini 4 Argon (High)", upstreamModelId: "gemini-4-argon(high)" },
-    { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)", upstreamModelId: "gemini-4-argon(medium)" },
-    { id: "gemini-4-argon-low", name: "Gemini 4 Argon (Low)", upstreamModelId: "gemini-4-argon(low)" },
     { id: "gemini-4-argon", name: "Gemini 4 Argon", upstreamModelId: "gemini-4-argon(medium)" },
     { id: "gemini-4-argo", name: "Gemini 4 Argo", upstreamModelId: "gemini-4-argo" },
     // Image generation models
