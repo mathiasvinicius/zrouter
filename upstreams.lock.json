@@ -13,8 +13,8 @@
       "ref": "release/v3.8.52",
       "commit": "c754707d0edf250107a386168d4e324f51b24135",
       "strategy": "selective-port-only",
-      "lastAudit": "2026-10-31",
-      "auditNote": "Audited 2026-10-31: latest release still v3.8.52 (published 2026-10-19); nenhuma porta nova — 9router v0.5.112 permanece superior. 0 ports."
+      "lastAudit": "2026-11-03",
+      "auditNote": "Audited 2026-11-03: latest published release still v3.8.52 (2026-10-19). Main carries prep for v3.8.53 (commits 2026-11-03: payload-aware anti-avalanche failover guard #15775, combo cooldown-expansion matrix), no tag/release yet. Nothing ported: no throughput/latency claim >=80%, resilience guard is watch item. 9router v0.5.112 remains superior. 0 ports."
     }
   }
 }
