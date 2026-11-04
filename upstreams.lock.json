@@ -13,8 +13,8 @@
       "ref": "release/v3.8.52",
       "commit": "c754707d0edf250107a386168d4e324f51b24135",
       "strategy": "selective-port-only",
-      "lastAudit": "2026-11-03",
-      "auditNote": "Audited 2026-11-03: latest published release still v3.8.52 (2026-10-19). Main carries prep for v3.8.53 (commits 2026-11-03: payload-aware anti-avalanche failover guard #15775, combo cooldown-expansion matrix), no tag/release yet. Nothing ported: no throughput/latency claim >=80%, resilience guard is watch item. 9router v0.5.112 remains superior. 0 ports."
+      "lastAudit": "2026-11-04",
+      "auditNote": "Audited 2026-11-04: latest published release still v3.8.52 (2026-10-19). Main advanced 2026-11-04 (d85886be, 475a13c5, 27d19557, 82f88177, 3c0990ae): opt-in TOTP 2FA for dashboard/CLI (#166xx), Gemini Live file-mode transcription executor (#15776), Antigravity silent-body failover watchdog on virtual clock, i18n doc re-syncs. No tag/release, no throughput/latency claim >=80%. Nothing ported (0 ports). Resilience guard remains watch item. 9router v0.5.112 stays superior."
     }
   }
 }
