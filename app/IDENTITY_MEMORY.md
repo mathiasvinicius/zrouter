@@ -46,3 +46,23 @@ be created there.
 
 Create and edit regular profiles from Dashboard -> Endpoint -> API Keys. The
 brain icon opens the assigned bank and allows an explicitly confirmed clear.
+
+## Runtime memory signal and caller-side marker (ADR 0383, mudanças A e B)
+
+`GET /v1/memory` (API key auth, same path as chat): answers whether memory is
+active for THE CALLER's key. Key with memory: `{object:"memory.status", memory:{enabled, bankId, mentalModelId, backend, live, latencyMs, injects}}`,
+with `live` from a 60s cached graph reachability probe (`RETURN 1`, 4s timeout;
+graph down degrades to `live:false`, never 5xx). Key without memory or a
+service key: `{"memory":{"enabled":false}}` only — never another key's bank.
+Never returns graph URL, credentials or memory text; `Cache-Control: private, no-store`.
+
+`<!-- ZALIVE_MEMORY:<bankId> ids=... -->` (bank optional) in the request body
+(end of the latest user turn; also accepted in replayed history) tells ZRouter
+the caller already injected recall for that bank: ZRouter skips its recall for
+the request (mental model, sources and retention are unaffected). The marker
+is untrusted input — it only skews the caller's own memory quality.
+`userTextWithoutInjectedContext` strips a trailing ZALIVE_MEMORY block so
+retention never persists it and recall never queries on it.
+
+Callers should ask `GET /v1/memory` on connect (and periodically, not per
+turn): if `enabled && live`, skip injecting lines that exist in `bankId`.

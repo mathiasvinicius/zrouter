@@ -11,6 +11,7 @@ import {
 import { getSettings, getApiKeyByValue, getComboById, getComboByName } from "@/lib/localDb";
 import { mentalModelForProfile, recallForProfile, retainForProfile } from "@/lib/identityMemory/index.js";
 import { recallSourcesForKey, capabilitiesBlockForKey, sourcesRecallMaxChars, sourcesQueryFromBody } from "@/lib/sources/context.js";
+import { bodyHasZaliveMemory } from "open-sse/rtk/identity.js";
 import { handleAntigravityQuotaError, clearAntigravityStrikes } from "../services/antigravityQuota.js";
 import { getModelInfo } from "../services/model.js";
 import { resolveDynamicCombo } from "../services/dynamicRouter.js";
@@ -138,9 +139,14 @@ export async function handleChat(request, clientRawRequest = null) {
     memoryProfile = profile;
     // Same query derivation the memory recall uses — delegated, not duplicated.
     const sourcesQuery = sourcesQueryFromBody(body);
+    // ADR 0383 (mudança B): a ZALIVE_MEMORY marker in the body means the
+    // caller already injected recall for this bank in its own turn — skip the
+    // recall call (and the ZROUTER_MEMORY injection downstream), keep mental
+    // model and sources, and keep retention untouched.
+    const skipRecall = bodyHasZaliveMemory(body);
     const [mentalModel, memory, sources] = await Promise.all([
       mentalModelForProfile(profile),
-      recallForProfile(profile, body),
+      skipRecall ? Promise.resolve("") : recallForProfile(profile, body),
       recallSourcesForKey(profile, sourcesQuery, settings),
     ]);
     identityContext = {

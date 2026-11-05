@@ -111,6 +111,24 @@ export function bodyHasAgentSoul(body) {
   return texts.some((text) => marker.test(text));
 }
 
+// ZALIVE_MEMORY signal (ADR 0383, mudança B): the caller already injected
+// recall for this bank in its own turn block, so ZRouter skips recall for the
+// request. The marker is untrusted input: skipping recall only degrades the
+// caller's own memory, never permissions. Match anywhere in the body (the
+// marker travels in the latest user turn but also appears in replayed
+// history), across every format injectIdentity handles. Retention is NOT
+// skipped — only recall is detoured in chat.js.
+const ZALIVE_MEMORY_MARKER = /<!--\s*ZALIVE_MEMORY[^>]{0,1024}\s*-->/;
+
+export function bodyHasZaliveMemory(body) {
+  if (!body || typeof body !== "object") return false;
+  try {
+    return ZALIVE_MEMORY_MARKER.test(JSON.stringify(body));
+  } catch {
+    return false;
+  }
+}
+
 export function bodyHasCapabilitiesCatalog(body) {
   const texts = systemTexts(body);
   return Boolean(texts && texts.some((text) => text.includes(CAPABILITIES_MARKER)));

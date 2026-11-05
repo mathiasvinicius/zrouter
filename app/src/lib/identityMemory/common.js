@@ -28,6 +28,10 @@ export function userTextWithoutInjectedContext(text) {
     const match = marker.exec(clean);
     if (match) clean = clean.slice(0, match.index);
   }
+  // ZALIVE_MEMORY turn block (ADR 0383) travels at the END of the latest user
+  // turn — strip it so retention never persists it and recall never treats it
+  // as query text.
+  clean = clean.replace(/<!--\s*ZALIVE_MEMORY:[\s\S]*?-->\s*$/g, "");
   return clean.trim();
 }
 
