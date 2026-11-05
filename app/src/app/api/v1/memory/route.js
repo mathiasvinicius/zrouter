@@ -74,5 +74,5 @@ export async function GET(request) {
 }
 
 export async function POST() {
-  return errorResponse(HTTP_STATUS.METHOD_NOT_ALLOWED, "Method not allowed");
+  return errorResponse(405, "Method not allowed");
 }
