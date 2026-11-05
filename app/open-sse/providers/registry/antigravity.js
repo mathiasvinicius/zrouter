@@ -17,7 +17,15 @@ export default {
     deprecationNotice: "RISK_NOTICE",
   },
   category: "oauth",
-  serviceKinds: ["llm", "image", "webSearch"],
+  serviceKinds: ["llm", "image", "webSearch", "stt"],
+  // STT via local agy-bridge (systemd, host loopback). The bridge forwards
+  // OpenAI-style input_audio parts to the antigravity CLI, which transcribes
+  // them (@path attachment). No cloud STT key needed — reuses the AGY OAuth.
+  sttConfig: {
+    baseUrl: "http://127.0.0.1:20130/v1/chat/completions",
+    authType: "none", // loopback bridge; per-connection baseUrl override still wins
+    format: "agy-stt",
+  },
   transport: {
     baseUrls: [ANTIGRAVITY_IDE_BASE_URL],
     format: "antigravity",
@@ -43,6 +51,7 @@ export default {
     },
   },
   models: [
+    { id: "audio-transcribe", name: "Audio → Text (Gemini)", kind: "stt", transport: "agy-stt", params: ["prompt", "response_format"] },
     { id: "gemini-4-argon-high", name: "Gemini 4 Argon (High)", upstreamModelId: "gemini-4-argon-high(high)" },
     { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)", upstreamModelId: "gemini-4-argon-medium(medium)" },
     { id: "gemini-4-argon-low", name: "Gemini 4 Argon (Low)", upstreamModelId: "gemini-4-argon-low(low)" },

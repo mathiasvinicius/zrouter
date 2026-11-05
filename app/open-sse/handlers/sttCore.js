@@ -125,6 +125,42 @@ async function transcribeGemini(cfg, file, model, token, formData) {
   return jsonResponse({ text });
 }
 
+// AGY bridge: audio travels as an OpenAI `input_audio` content part; the local
+// agy-bridge drops it to a temp file and appends @path to the antigravity CLI
+// prompt, which transcribes it (Gemini-family multimodal input). authType none:
+// the bridge listens on loopback only and reuses the AGY OAuth of the host.
+async function transcribeAgyBridge(cfg, file, model, token, formData) {
+  const buf = await file.arrayBuffer();
+  const b64 = Buffer.from(buf).toString("base64");
+  const mime = resolveAudioContentType(file);
+  const audioFormat = (mime.split("/")[1] || "mp3").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp3";
+  const lang = formData.get("language");
+  const userPrompt = formData.get("prompt");
+  let promptText = userPrompt && typeof userPrompt === "string" && userPrompt.trim()
+    ? userPrompt.trim()
+    : "Transcribe the attached audio faithfully. Reply with ONLY the transcript, no commentary.";
+  if (typeof lang === "string" && lang.trim()) promptText += ` Language: ${lang.trim()}.`;
+
+  const res = await fetch(cfg.baseUrl, {
+    method: "POST",
+    headers: token ? { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } : { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: model.includes("/") ? String(model).split("/").pop() : model,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: promptText },
+          { type: "input_audio", input_audio: { data: b64, format: audioFormat } },
+        ],
+      }],
+    }),
+  });
+  if (!res.ok) return upstreamError(res);
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || "";
+  return jsonResponse({ text: String(text).trim() });
+}
+
 // ElevenLabs Scribe: multipart POST /v1/speech-to-text (xi-api-key).
 // Optional renderings (srt/vtt/seg_json) come back as `additional_formats`; the
 // requested one is served verbatim instead of being fabricated from the JSON body.
@@ -324,6 +360,7 @@ export async function handleSttCore({ provider, model, formData, credentials, st
       case "nvidia-asr":      return await transcribeNvidia(cfg, file, model, token);
       case "huggingface-asr": return await transcribeHuggingFace(cfg, file, model, token);
       case "gemini-stt":      return await transcribeGemini(cfg, file, model, token, formData);
+      case "agy-stt":         return await transcribeAgyBridge(cfg, file, model, token, formData);
       case "elevenlabs-stt":  return await transcribeElevenLabs(cfg, file, model, token, formData);
       default:                return await transcribeOpenAICompatible(cfg, file, model, token, formData);
     }
