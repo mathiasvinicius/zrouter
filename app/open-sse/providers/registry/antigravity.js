@@ -51,7 +51,7 @@ export default {
     },
   },
   models: [
-    { id: "audio-transcribe", name: "Audio → Text (Gemini)", kind: "stt", transport: "agy-stt", params: ["prompt", "response_format"] },
+    { id: "audio-transcribe", name: "Audio → Text (Gemini)", kind: "stt", transport: "agy-stt", upstreamModelId: "gemini-4-argon-low", params: ["prompt", "response_format"] },
     { id: "gemini-4-argon-high", name: "Gemini 4 Argon (High)", upstreamModelId: "gemini-4-argon-high(high)" },
     { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)", upstreamModelId: "gemini-4-argon-medium(medium)" },
     { id: "gemini-4-argon-low", name: "Gemini 4 Argon (Low)", upstreamModelId: "gemini-4-argon-low(low)" },

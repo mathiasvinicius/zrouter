@@ -37,7 +37,7 @@ describe("STT via agy-bridge (antigravity)", () => {
     expect(payload.text).toBe("Olá, teste.");
     const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body);
-    expect(body.model).toBe("audio-transcribe");
+    expect(body.model).toBe("gemini-4-argon-low");
     expect(body.messages[0].content[0].text).toContain("Language: pt");
     expect(body.messages[0].content[1].type).toBe("input_audio");
     expect(Object.keys(init.headers ?? {})).not.toContain("Authorization");
@@ -55,7 +55,7 @@ describe("STT via agy-bridge (antigravity)", () => {
       sttConfig: CFG,
     });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.model).toBe("audio-transcribe");
+    expect(body.model).toBe("gemini-4-argon-low");
     expect(body.messages[0].content[0].text).toBe("Transcreva exatamente");
     expect(body.messages[0].content[1].input_audio.format).toBe("ogg");
   });

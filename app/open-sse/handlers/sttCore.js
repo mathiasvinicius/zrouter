@@ -141,11 +141,16 @@ async function transcribeAgyBridge(cfg, file, model, token, formData) {
     : "Transcribe the attached audio faithfully. Reply with ONLY the transcript, no commentary.";
   if (typeof lang === "string" && lang.trim()) promptText += ` Language: ${lang.trim()}.`;
 
+  // STT wrapper ids ("audio-transcribe") are not real CLI models — resolve the
+  // registry upstream the same way chat executors do.
+  const bare = model.includes("/") ? String(model).split("/").pop() : model;
+  const entry = (PROVIDER_MODELS["ag"] || []).find((m) => m?.id === bare || m?.upstreamModelId === bare);
+
   const res = await fetch(cfg.baseUrl, {
     method: "POST",
     headers: token ? { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } : { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: model.includes("/") ? String(model).split("/").pop() : model,
+      model: entry?.upstreamModelId || bare,
       messages: [{
         role: "user",
         content: [
