@@ -245,7 +245,10 @@ export default {
       prompt_cache_key: randomUUID(),
       stream: true,
       store: false,
-      reasoning: toolModel ? { effort: "medium", summary: "auto" } : null,
+      // 2026-11-06: upstream image tool rejects reasoning effort —
+      // "Complexity 'medium' is not supported for this image model"
+      // (invalid_value / param complexity). Verified generating fine without it.
+      reasoning: null,
     };
   },
   // Custom: codex parses SSE → either pipe to client or collect b64
