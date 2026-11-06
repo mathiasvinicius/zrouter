@@ -13,8 +13,8 @@
       "ref": "release/v3.8.52",
       "commit": "c754707d0edf250107a386168d4e324f51b24135",
       "strategy": "selective-port-only",
-      "lastAudit": "2026-11-05",
-      "auditNote": "Audited 2026-11-05: latest published release still v3.8.52 (2026-10-19). Main advanced with the v3.8.53 fix train (da3266d3, 281572ab, c84f0551, d5114807, 2e4ab196, f28fc962, 1abf11e7, 9d9c3e83, 594368eb, 7edefe19, 8344aabf, e2a77a93, 3895e09e, c8926001, 44e201b8, 1c3fb421, 4fc4a5da, c6cfb5a3, ca1f8cb7, 20a79575, e2a77a93, 0b4c6a6c): docs/i18n re-syncs, dashboard kit Tile/Disclosure/ToggleChip/Progress refactor, SSE deadline/quota-alias/egress-probe fixes, Leonardo image-video UUIDs, amd64+arm64 image requirement, CLI usage token counts, M365 refresh token config. No tag/release, no benchmark or throughput/latency claim >=80%. Nothing ported (0 ports). 9router v0.5.112 stays superior."
+      "lastAudit": "2026-11-06",
+      "auditNote": "Audited 2026-11-06: latest published release still v3.8.52 (2026-10-19), unchanged since last audit. Main advanced with non-perf commits: 5111ba53 docs(quality-gates) CI lanes/merge queue (#19184), 7e640dee chore(dashboard) UI kit 0.0.104 + dialogs/data/chart/spinner, 77f7bcbe chore(release) Release-Green lane limit 90m (#19177). No tag, no benchmark, no throughput/latency claim >=80%. Nothing ported (0 ports). 9router v0.5.112 stays superior."
     }
   }
 }
