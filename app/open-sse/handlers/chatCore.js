@@ -170,7 +170,13 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
   const providerRequiresStreaming = PROVIDERS[provider]?.forceStream === true;
+  // 2026-11-07: upstream streamGenerateContent for antigravity regressed 2-3x
+  // (measured TTFT 18-33s vs ~9-14s non-stream; Google-side, escalated). The
+  // executor now always calls non-streaming generateContent, so cap the
+  // upstream here too and let the gateway stream the collected response.
+  const upstreamNonStream = provider === "antigravity" || provider === "gemini-cli";
   let stream = providerRequiresStreaming ? true : (body.stream !== false);
+  if (upstreamNonStream && !providerRequiresStreaming) stream = false;
 
   // Image generation models require non-streaming (Google v1internal:generateContent)
   const modelType = getModelType(alias, model);
