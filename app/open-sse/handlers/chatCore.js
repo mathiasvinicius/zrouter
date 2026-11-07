@@ -580,6 +580,30 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   if (!stream) {
     const result = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, reqLogger, toolNameMap, customToolNames, trackDone, appendLog });
     streamController.handleComplete();
+    // 2026-11-07: client asked for SSE but the upstream was capped to
+    // non-stream (antigravity streaming regression). Synthesize a single-chunk
+    // OpenAI stream from the collected JSON so streaming clients keep working
+    // (and don't wait with zero bytes until completion).
+    if (clientRequestedStreaming && result && !providerRequiresStreaming) {
+      try {
+        const payload = await result.clone().json();
+        const choice = payload?.choices?.[0] || {};
+        const chunk = {
+          id: payload?.id || `chatcmpl-synth-${Date.now()}`,
+          object: "chat.completion.chunk",
+          created: payload?.created || Math.floor(Date.now() / 1000),
+          model: payload?.model || model,
+          choices: [{ index: 0, delta: { role: "assistant", ...(choice.message || {}) }, finish_reason: choice.finish_reason ?? "stop" }],
+        };
+        const sse = `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n`;
+        return new Response(sse, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Access-Control-Allow-Origin": "*" },
+        });
+      } catch (e) {
+        log?.debug?.("STREAM", `synthetic SSE failed, falling back to JSON: ${e?.message}`);
+      }
+    }
     return result;
   }
 
