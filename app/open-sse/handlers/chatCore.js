@@ -586,7 +586,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     // (and don't wait with zero bytes until completion).
     if (clientRequestedStreaming && result && !providerRequiresStreaming) {
       try {
-        const payload = await result.clone().json();
+        const resp = (result && typeof result === "object" && result.response) ? result.response : result;
+        const payload = await resp.clone().json();
         const choice = payload?.choices?.[0] || {};
         const chunk = {
           id: payload?.id || `chatcmpl-synth-${Date.now()}`,
