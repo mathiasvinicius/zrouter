@@ -154,7 +154,12 @@ export class AntigravityExecutor extends BaseExecutor {
     const baseUrls = this.getBaseUrls();
     const baseUrl = baseUrls[urlIndex] || baseUrls[0];
     // Image generation MUST use non-streaming generateContent
-    const forceNonStream = isImageModel(model);
+    // 2026-11-07: upstream streamGenerateContent path for antigravity regressed
+    // badly (measured TTFT 18-32s vs ~9s non-stream for the same prompt; Google
+    // confirmed the CLI/IDE streaming latency regression — discuss.ai.google.dev
+    // 198688). Force chat through generateContent; the gateway streams the
+    // complete response to the client.
+    const forceNonStream = true;
     const action = (stream && !forceNonStream) ? "streamGenerateContent?alt=sse" : "generateContent";
     return `${baseUrl}/v1internal:${action}`;
   }
