@@ -3,8 +3,8 @@
   "upstreams": {
     "9router": {
       "repository": "https://github.com/decolua/9router.git",
-      "ref": "v0.5.112",
-      "commit": "1fe586bb1cf35e1ed0cb2150a8ef7d1db040b21d",
+      "ref": "v0.5.116",
+      "commit": "1339107e624d1ab150c6a0c2c2ee22caa7e9db2f",
       "destination": "app/",
       "strategy": "vendored-three-way"
     },
@@ -13,8 +13,8 @@
       "ref": "v3.8.53",
       "commit": "191dce8d534ceb56c28a08e71381284a9a87838f",
       "strategy": "selective-port-only",
-      "lastAudit": "2026-11-07",
-      "auditNote": "Audited 2026-11-07: NEW release v3.8.53 published 2026-11-06 10:53Z (tag commit 191dce8d53, cycle c754707d0e..616801a2b6, 1162 commits, 1189 changelog entries). Delta v3.8.52..v3.8.53 = 5 commits / 7849 files / +212523 -61246, dominated by CI, i18n (158 docs files) and the opencode plugin. 10 perf entries, none with a published benchmark >=80% request throughput/latency: perf(quota) 14-21s event-loop stalls (scoped to many-connection instances), perf(resilience) resolveResilienceSettings 9us->0.4us, perf hot-path settings/combo short-TTL caches, perf(logging) 63us->0.3us padStart, perf(build) incremental tsc, perf(provider-stats) 7-day window + hidden-tab pause. Measured on this host instead of assuming: /api/providers 2.5ms, /api/combos 2.7ms, /api/models 6.1ms, /api/usage/availability 4.3ms, /api/resilience 2.7ms -> no event-loop stall to remove and no headroom for a >80% gain, so every candidate is marginal by definition. Nothing ported (0 ports). 9router v0.5.112 stays superior; bases/OmniRoute synced to v3.8.53 for future selective ports."
+      "lastAudit": "2026-11-09",
+      "auditNote": "Rechecked 2026-11-09: no new OmniRoute release — v3.8.53 (tag commit 191dce8d53) is still the latest tag; nothing to compare, 0 ports. Previous full audit 2026-11-07 stands: 10 perf entries, none with a published benchmark >=80% request throughput/latency; host measurements /api/providers 2.5ms, /api/combos 2.7ms, /api/models 6.1ms, /api/usage/availability 4.3ms, /api/resilience 2.7ms leave no headroom for a >80% gain. 9router v0.5.116 remains superior."
     }
   }
 }
