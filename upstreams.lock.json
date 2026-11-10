@@ -13,8 +13,8 @@
       "ref": "v3.8.53",
       "commit": "191dce8d534ceb56c28a08e71381284a9a87838f",
       "strategy": "selective-port-only",
-      "lastAudit": "2026-11-09",
-      "auditNote": "Rechecked 2026-11-09: no new OmniRoute release — v3.8.53 (tag commit 191dce8d53) is still the latest tag; nothing to compare, 0 ports. Previous full audit 2026-11-07 stands: 10 perf entries, none with a published benchmark >=80% request throughput/latency; host measurements /api/providers 2.5ms, /api/combos 2.7ms, /api/models 6.1ms, /api/usage/availability 4.3ms, /api/resilience 2.7ms leave no headroom for a >80% gain. 9router v0.5.116 remains superior."
+      "lastAudit": "2026-11-10",
+      "auditNote": "Rechecked 2026-11-10: still no OmniRoute release after v3.8.53 (tag commit 191dce8d53, published 2026-11-06); upstream HEAD equals the tracked 9router v0.5.116 (1339107e62), so nothing to merge and 0 ports. Standing 2026-11-07 benchmark audit: 10 perf entries, none published >=80% request throughput/latency; host measurements leave no headroom (/api/providers 2.5ms, /api/combos 2.7ms, /api/models 6.1ms, /api/usage/availability 4.3ms, /api/resilience 2.7ms). 9router v0.5.116 remains superior."
     }
   }
 }
