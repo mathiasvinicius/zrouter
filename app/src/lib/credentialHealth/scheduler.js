@@ -59,21 +59,51 @@ function isEnabled(env = process.env) {
  * State patch that a SUCCESSFUL re-validation writes: the stale failure state is
  * invalidated, not just overwritten. Keys mirror the repo's own
  * resetHealthStateOnActivation, so a direct scheduler write is idempotent with it.
+ * Active future modelLock_* cooldowns from quota/balance errors (429/402) are
+ * preserved until they expire naturally.
  */
-export function successHealthPatch(connection) {
-  const patch = {
+export function successHealthPatch(connection, now = Date.now()) {
+  const isQuotaOrBalanceLock =
+    connection?.errorCode === 429 || connection?.errorCode === 402;
+  let hasActiveQuotaLock = false;
+  const lockPatch = {};
+
+  for (const [key, val] of Object.entries(connection || {})) {
+    if (!key.startsWith("modelLock_")) continue;
+    const lockUntilMs = val ? new Date(val).getTime() : 0;
+    if (isQuotaOrBalanceLock && lockUntilMs > now) {
+      hasActiveQuotaLock = true;
+    } else {
+      lockPatch[key] = null;
+    }
+  }
+
+  if (hasActiveQuotaLock) {
+    const rlUntilMs = connection?.rateLimitedUntil
+      ? new Date(connection.rateLimitedUntil).getTime()
+      : 0;
+    return {
+      testStatus: connection.testStatus || "unavailable",
+      lastError: connection.lastError ?? null,
+      lastErrorAt: connection.lastErrorAt ?? null,
+      errorCode: connection.errorCode,
+      backoffLevel: connection.backoffLevel ?? 0,
+      rateLimitedUntil: rlUntilMs > now ? connection.rateLimitedUntil : null,
+      lastTested: new Date(now).toISOString(),
+      ...lockPatch,
+    };
+  }
+
+  return {
     testStatus: "active",
     lastError: null,
     lastErrorAt: null,
     errorCode: null,
     backoffLevel: 0,
     rateLimitedUntil: null,
-    lastTested: new Date().toISOString(),
+    lastTested: new Date(now).toISOString(),
+    ...lockPatch,
   };
-  for (const key of Object.keys(connection || {})) {
-    if (key.startsWith("modelLock_")) patch[key] = null;
-  }
-  return patch;
 }
 
 /** State patch for a FAILED re-validation. */

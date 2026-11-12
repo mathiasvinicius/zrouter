@@ -19,7 +19,7 @@ export default {
   authModes: ["apikey"],
   transport: {
     baseUrl: "https://ollama.com/api/chat",
-    validateUrl: "https://ollama.com/api/tags",
+    validateUrl: "https://ollama.com/api/usage",
     format: "ollama",
   },
   models: [

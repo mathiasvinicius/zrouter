@@ -124,6 +124,36 @@ describe("credential health — stale state is cleared on successful re-validati
     expect(Object.keys(patch).every((k) => k.startsWith("modelLock_") || k === "lastTested" || k in connection)).toBe(true);
   });
 
+  it("successHealthPatch preserves active future 429/402 modelLock_* cooldowns while clearing expired ones", () => {
+    const now = Date.parse("2026-11-12T12:00:00.000Z");
+    const connection = {
+      id: "c-quota",
+      testStatus: "unavailable",
+      errorCode: 429,
+      backoffLevel: 2,
+      rateLimitedUntil: "2026-11-12T12:30:00.000Z",
+      lastError: "[429]: usage_limit_reached",
+      lastErrorAt: "2026-11-12T11:55:00.000Z",
+      "modelLock_gpt-5.4": "2026-11-12T12:30:00.000Z",
+      "modelLock_gpt-5.3-codex": "2026-11-12T11:50:00.000Z", // expired
+    };
+    const patch = successHealthPatch(connection, now);
+    expect(patch.testStatus).toBe("unavailable");
+    expect(patch.errorCode).toBe(429);
+    expect(patch.lastError).toBe("[429]: usage_limit_reached");
+    expect(patch.rateLimitedUntil).toBe("2026-11-12T12:30:00.000Z");
+    expect(patch["modelLock_gpt-5.4"]).toBeUndefined(); // active future lock preserved
+    expect(patch["modelLock_gpt-5.3-codex"]).toBeNull(); // expired lock cleared
+
+    // Once all 429 locks expire, successHealthPatch restores active state
+    const afterExpiry = Date.parse("2026-11-12T12:31:00.000Z");
+    const patchAfter = successHealthPatch(connection, afterExpiry);
+    expect(patchAfter.testStatus).toBe("active");
+    expect(patchAfter.errorCode).toBeNull();
+    expect(patchAfter["modelLock_gpt-5.4"]).toBeNull();
+    expect(patchAfter["modelLock_gpt-5.3-codex"]).toBeNull();
+  });
+
   it("failureHealthPatch records the error and the backoff level", () => {
     const patch = failureHealthPatch("Token invalid", 2);
     expect(patch.testStatus).toBe("error");

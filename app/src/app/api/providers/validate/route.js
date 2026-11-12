@@ -396,6 +396,8 @@ export async function POST(request) {
         case "hyperbolic":
         case "ollama":
         case "ollama-local":
+        case "tavily":
+        case "huggingface":
         case "assemblyai":
         case "nanobanana":
         case "chutes":
@@ -407,13 +409,16 @@ export async function POST(request) {
             ...Object.fromEntries(
               Object.entries(PROVIDERS).filter(([, t]) => t.validateUrl).map(([id, t]) => [id, t.validateUrl])
             ),
-            // dynamic URLs (depend on providerSpecificData) — kept inline
+            // dynamic URLs (depend on providerSpecificData) or non-transport providers — kept inline
             "ollama-local": `${resolveOllamaLocalHost({ providerSpecificData })}/api/tags`,
             "xiaomi-tokenplan": `${resolveXiaomiTokenplanBaseUrl({ providerSpecificData })}/models`,
+            "tavily": "https://api.tavily.com/usage",
+            "huggingface": "https://huggingface.co/api/whoami-v2",
           };
           const headers = {};
           if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-          const res = await fetch(endpoints[provider], { headers, signal: AbortSignal.timeout(8000) });
+          const timeoutMs = provider === "tavily" ? 30000 : 8000;
+          const res = await fetch(endpoints[provider], { headers, signal: AbortSignal.timeout(timeoutMs) });
           // xai returns 400 for bad key, 403 for valid-but-no-credit. Other providers use 401.
           if (provider === "xai") {
             isValid = res.status === 200 || res.status === 403;

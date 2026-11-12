@@ -270,7 +270,17 @@ export async function markAccountUnavailable(connectionId, status, errorText, pr
   if (!shouldFallback) return { shouldFallback: false, cooldownMs: 0 };
 
   const reason = typeof errorText === "string" ? errorText.slice(0, 200) : "Provider error";
-  const lockUpdate = buildModelLockUpdate(githubResetAtMs ? null : model, cooldownMs);
+  // Static API keys without refreshToken that fail with 401/403 (invalid key) or 402 (insufficient balance)
+  // fail across all models on that key — lock account-wide (modelLock___all) so combos don't waste retries.
+  const statusNum = Number(status);
+  const isAccountWideApiKeyError =
+    (statusNum === 401 || statusNum === 403 || statusNum === 402) &&
+    conn?.authType === "apikey" &&
+    !conn?.refreshToken;
+  const lockUpdate = buildModelLockUpdate(
+    githubResetAtMs || isAccountWideApiKeyError ? null : model,
+    cooldownMs
+  );
 
   await updateProviderConnection(connectionId, {
     ...lockUpdate,

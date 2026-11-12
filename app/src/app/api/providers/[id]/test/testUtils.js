@@ -808,7 +808,15 @@ async function testApiKeyConnection(connection, effectiveProxy = null) {
         return { valid: res.ok, error: res.ok ? null : "Invalid API key" };
       }
       case "ollama": {
-        const res = await fetch("https://ollama.com/api/tags", { headers: { Authorization: `Bearer ${connection.apiKey}` } });
+        const res = await fetchWithConnectionProxy("https://ollama.com/api/usage", { headers: { Authorization: `Bearer ${connection.apiKey}` } }, effectiveProxy);
+        return { valid: res.ok, error: res.ok ? null : "Invalid API key" };
+      }
+      case "tavily": {
+        const res = await fetchWithConnectionProxy("https://api.tavily.com/usage", { headers: { Authorization: `Bearer ${connection.apiKey}` }, signal: AbortSignal.timeout(30000) }, effectiveProxy);
+        return { valid: res.ok, error: res.ok ? null : "Invalid API key" };
+      }
+      case "huggingface": {
+        const res = await fetchWithConnectionProxy("https://huggingface.co/api/whoami-v2", { headers: { Authorization: `Bearer ${connection.apiKey}` } }, effectiveProxy);
         return { valid: res.ok, error: res.ok ? null : "Invalid API key" };
       }
       case "ollama-local": {
@@ -1006,14 +1014,27 @@ export async function testSingleConnection(id) {
   // Soft success (e.g. Grok CLI 402 spending-limit): credentials are good, account is
   // out of credits. Keep testStatus active; surface the message as lastError so the
   // dashboard can show a warning without marking the connection broken.
+  // Also preserve active quota/balance locks (429/402) with future modelLock_* cooldowns
+  // so superficial credential probes don't prematurely mark a rate-limited account active.
+  const nowMs = Date.now();
+  const hasActiveQuotaLock =
+    result.valid &&
+    (connection.errorCode === 429 || connection.errorCode === 402) &&
+    Object.entries(connection).some(
+      ([k, v]) => k.startsWith("modelLock_") && v && new Date(v).getTime() > nowMs
+    );
   const softWarning = result.valid && (result.warning || result.error);
   const updateData = {
-    testStatus: result.valid ? "active" : "error",
-    lastError: result.valid ? (softWarning || null) : result.error,
+    testStatus: result.valid ? (hasActiveQuotaLock ? "unavailable" : "active") : "error",
+    lastError: result.valid
+      ? (softWarning || (hasActiveQuotaLock ? connection.lastError : null))
+      : result.error,
     lastErrorAt: result.valid
       ? softWarning
         ? new Date().toISOString()
-        : null
+        : hasActiveQuotaLock
+          ? connection.lastErrorAt
+          : null
       : new Date().toISOString(),
   };
 

@@ -4,6 +4,20 @@ Este documento consolida a evolução, marcos arquiteturais, aprimoramentos cust
 
 ---
 
+## v0.5.116-p1 (2026-11-12) — Correção de Falso-Positivo 401/Unavailable, Preservação de Cooldowns 429/402 e Fast-Fail de API Keys
+
+Auditoria regressiva e correção estrutural do sintoma `unavailable | Chave API | ⏱ 42s | checked 5m ago | [401]: {"error":"Unauthorized"} | #1`:
+
+- **Validação autenticada do Ollama Cloud (`https://ollama.com/api/usage`)**: corrigido o falso-positivo em `open-sse/providers/registry/ollama.js`, `src/app/api/providers/[id]/test/testUtils.js` e `tests/__baseline__/providers-baseline.json`, que consultavam o endpoint público `/api/tags` (HTTP 200 mesmo com chave inválida/revogada) e faziam o `CredentialHealth` limpar o lock de erro a cada 5 minutos.
+- **Preservação de cooldowns ativos de quota/saldo (`429`/`402`) no `CredentialHealth`**: `successHealthPatch` (`src/lib/credentialHealth/scheduler.js`) e `testSingleConnection` (`src/app/api/providers/[id]/test/testUtils.js`) agora preservam `modelLock_*` futuros e `testStatus: "unavailable"` quando `errorCode` é `429` ou `402`, evitando que checks superficiais de credencial apaguem cooldowns legítimos a cada 5 minutos.
+- **Fast-fail em `401`/`403` e lock account-wide (`modelLock___all`) para chaves estáticas**:
+  - `open-sse/handlers/chatCore.js`: pula as 3 tentativas de `refreshWithRetry` (~3,1s de backoff) quando `authType === "apikey"` sem `refreshToken`.
+  - `src/sse/services/auth.js`: `markAccountUnavailable` aplica `modelLock___all` em erros `401`/`402`/`403` de chaves estáticas (`apikey` sem `refreshToken`), impedindo que combos tentem múltiplos modelos na mesma chave inválida ou sem saldo.
+- **Suporte de validação para `tavily` e `huggingface`**: adicionados `case "tavily"` (`https://api.tavily.com/usage` com timeout de 30s) e `case "huggingface"` (`https://huggingface.co/api/whoami-v2`) em `testUtils.js` e `validate/route.js`.
+- **Saneamento do banco `data.sqlite`**: ativado `enforceCombo = 1` na chave `ArianeMathias` (eliminando loop externo de `ollama/beam` a cada 8s), mantida ativa a conexão `ollama/9router_key2` com a nova chave válida (`200 OK` em `ollama/deepseek-v4.1-flash:cloud` e `ollama/beam`), mantida inativa `siliconflow` (sem saldo) e limpos locks órfãos em conexões inativas.
+
+---
+
 ## v0.5.112-p1 (2026-10-29) — Expurgo de telemetria/phone-home do WebGUI
 
 Auditoria do cron de manutenção identificou três chamadas externas não autorizadas na WebGUI, todas removidas:
